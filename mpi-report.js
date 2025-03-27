@@ -864,7 +864,7 @@ function clearValues() {
   // 更新報告
   updateReports();
   
-  showNotification('所有數值已重置');
+  showNotification('All values have been reset.');
 }
 
 /**
