@@ -140,687 +140,59 @@ function generateReportFromDiagrams() {
   const stressValues = collectDiagramValues('topChart');
   const restValues = collectDiagramValues('bottomChart');
   
-  // 映射閾值 (0=正常, 1=輕度, 2=中度, 3=重度)
-  const dic = { "0": 0, "1": 1, "2": 2, "3": 3 };
-  
-  // 使用已經更新的 segmentDefinition
-  const segmentDefinition = {
-    // 中心點 (apex)
-    apex: [18],
+  // 使用 updateReport.js 的函數生成報告
+  const values = {
+    // 壓力(stress)測試的值
+    "valueStressApex": stressValues[18] || 0,
+    "valueStressBasalAnterior": stressValues[4] || 0,
+    "valueStressMiddleAnterior": stressValues[10] || 0,
+    "valueStressApicalAnterior": stressValues[15] || 0,
+    "valueStressBasalAnteroseptal": stressValues[3] || 0,
+    "valueStressMiddleAnteroseptal": stressValues[9] || 0,
+    "valueStressApicalAnteroseptal": stressValues[14] || 0,
+    "valueStressBasalInferoseptal": stressValues[2] || 0,
+    "valueStressMiddleInferoseptal": stressValues[8] || 0,
+    "valueStressApicalInferoseptal": stressValues[13] || 0,
+    "valueStressBasalInferior": stressValues[1] || 0,
+    "valueStressMiddleInfterior": stressValues[7] || 0,
+    "valueStressApicalInfterior": stressValues[12] || 0,
+    "valueStressBasalInferolateral": stressValues[0] || 0,
+    "valueStressMiddleInferolateral": stressValues[6] || 0,
+    "valueStressApicalInferolateral": stressValues[17] || 0,
+    "valueStressBasalAnterolateral": stressValues[5] || 0,
+    "valueStressMiddleAnterolateral": stressValues[11] || 0,
+    "valueStressApicalAnterolateral": stressValues[16] || 0,
     
-    // 前壁 (anterior) 分段
-    basalAnterior: [4],
-    middleAnterior: [10],
-    apicalAnterior: [15],
-    
-    // 前隔壁 (anteroseptal) 分段
-    basalAnteroseptal: [3],
-    middleAnteroseptal: [9],
-    apicalAnteroseptal: [14],
-    
-    // 下隔壁 (inferoseptal) 分段
-    basalInferoseptal: [2],
-    middleInferoseptal: [8],
-    apicalInferoseptal: [13],
-    
-    // 下壁 (inferior) 分段
-    basalInferior: [1],
-    middleInferior: [7],
-    apicalInferior: [12],
-    
-    // 下外側壁 (inferolateral) 分段
-    basalInferolateral: [0],
-    middleInferolateral: [6],
-    apicalInferolateral: [17],
-    
-    // 前外側壁 (anterolateral) 分段
-    basalAnterolateral: [5],
-    middleAnterolateral: [11],
-    apicalAnterolateral: [16],
+    // 休息(rest)測試的值
+    "valueRestApex": restValues[18] || 0,
+    "valueRestBasalAnterior": restValues[4] || 0,
+    "valueRestMiddleAnterior": restValues[10] || 0,
+    "valueRestApicalAnterior": restValues[15] || 0,
+    "valueRestBasalAnteroseptal": restValues[3] || 0,
+    "valueRestMiddleAnteroseptal": restValues[9] || 0,
+    "valueRestApicalAnteroseptal": restValues[14] || 0,
+    "valueRestBasalInferoseptal": restValues[2] || 0,
+    "valueRestMiddleInferoseptal": restValues[8] || 0,
+    "valueRestApicalInferoseptal": restValues[13] || 0,
+    "valueRestBasalInferior": restValues[1] || 0,
+    "valueRestMiddleInfterior": restValues[7] || 0,
+    "valueRestApicalInfterior": restValues[12] || 0,
+    "valueRestBasalInferolateral": restValues[0] || 0,
+    "valueRestMiddleInferolateral": restValues[6] || 0,
+    "valueRestApicalInferolateral": restValues[17] || 0,
+    "valueRestBasalAnterolateral": restValues[5] || 0,
+    "valueRestMiddleAnterolateral": restValues[11] || 0,
+    "valueRestApicalAnterolateral": restValues[16] || 0,
   };
   
-  // 血管區域分組
-  const vesselRegions = {
-    LAD: ['apex', 'basalAnterior', 'middleAnterior', 'apicalAnterior', 
-          'basalAnteroseptal', 'middleAnteroseptal', 'apicalAnteroseptal'],
-    RCA: ['basalInferoseptal', 'middleInferoseptal', 'apicalInferoseptal',
-          'basalInferior', 'middleInferior', 'apicalInferior'],
-    LCX: ['basalInferolateral', 'middleInferolateral', 'apicalInferolateral',
-          'basalAnterolateral', 'middleAnterolateral', 'apicalAnterolateral']
-  };
+  // 調用 updateReport 函數
+  const reportResult = updateReport(values);
   
-  // 區域對應的簡短名稱（用於報告描述）
-  const regionDisplayNames = {
-    LAD: ["anterior", "anteroseptal", "apex"],
-    RCA: ["inferoseptal", "inferior"],
-    LCX: ["inferolateral", "anterolateral"]
-  };
-  
-  // 提取每個區域的值
-  const extractValues = function(values, segmentDef) {
-    const result = {};
-    Object.keys(segmentDef).forEach(region => {
-      const indices = segmentDef[region];
-      result[region] = indices.map(idx => values[idx] || 0);
-    });
-    return result;
-  };
-  
-  // 提取每個區域的應力和休息值
-  const regionStressValues = extractValues(stressValues, segmentDefinition);
-  const regionRestValues = extractValues(restValues, segmentDefinition);
-  
-  // 計算各血管區域的應力缺損值
-  const vesselStressValues = {};
-  const vesselRestValues = {};
-  Object.keys(vesselRegions).forEach(vessel => {
-    vesselStressValues[vessel] = [];
-    vesselRestValues[vessel] = [];
-    vesselRegions[vessel].forEach(region => {
-      vesselStressValues[vessel] = vesselStressValues[vessel].concat(regionStressValues[region]);
-      vesselRestValues[vessel] = vesselRestValues[vessel].concat(regionRestValues[region]);
-    });
-  });
-  
-  // 計算各區域的面積
-  function calculateAreas() {
-    // 計算應力檢查的各區域面積
-    const stressAreas = {
-      apex: regionStressValues.apex[0] > 0 ? 1 : 0,
-      
-      basalAnterior: regionStressValues.basalAnterior[0] > 0 ? 1 : 0,
-      middleAnterior: regionStressValues.middleAnterior[0] > 0 ? 1 : 0,
-      apicalAnterior: regionStressValues.apicalAnterior[0] > 0 ? 1 : 0,
-      
-      basalAnteroseptal: regionStressValues.basalAnteroseptal[0] > 0 ? 1 : 0,
-      middleAnteroseptal: regionStressValues.middleAnteroseptal[0] > 0 ? 1 : 0,
-      apicalAnteroseptal: regionStressValues.apicalAnteroseptal[0] > 0 ? 0.5 : 0,
-      
-      basalInferoseptal: regionStressValues.basalInferoseptal[0] > 0 ? 1 : 0,
-      middleInferoseptal: regionStressValues.middleInferoseptal[0] > 0 ? 1 : 0,
-      apicalInferoseptal: regionStressValues.apicalInferoseptal[0] > 0 ? 0.5 : 0,
-      
-      basalInferior: regionStressValues.basalInferior[0] > 0 ? 1 : 0,
-      middleInferior: regionStressValues.middleInferior[0] > 0 ? 1 : 0,
-      apicalInferior: regionStressValues.apicalInferior[0] > 0 ? 1 : 0,
-      
-      basalInferolateral: regionStressValues.basalInferolateral[0] > 0 ? 1 : 0,
-      middleInferolateral: regionStressValues.middleInferolateral[0] > 0 ? 1 : 0,
-      apicalInferolateral: regionStressValues.apicalInferolateral[0] > 0 ? 0.5 : 0,
-      
-      basalAnterolateral: regionStressValues.basalAnterolateral[0] > 0 ? 1 : 0,
-      middleAnterolateral: regionStressValues.middleAnterolateral[0] > 0 ? 1 : 0,
-      apicalAnterolateral: regionStressValues.apicalAnterolateral[0] > 0 ? 0.5 : 0
-    };
-    
-    // 計算休息檢查的各區域面積
-    const restAreas = {
-      apex: regionRestValues.apex[0] > 0 ? 1 : 0,
-      
-      basalAnterior: regionRestValues.basalAnterior[0] > 0 ? 1 : 0,
-      middleAnterior: regionRestValues.middleAnterior[0] > 0 ? 1 : 0,
-      apicalAnterior: regionRestValues.apicalAnterior[0] > 0 ? 1 : 0,
-      
-      basalAnteroseptal: regionRestValues.basalAnteroseptal[0] > 0 ? 1 : 0,
-      middleAnteroseptal: regionRestValues.middleAnteroseptal[0] > 0 ? 1 : 0,
-      apicalAnteroseptal: regionRestValues.apicalAnteroseptal[0] > 0 ? 0.5 : 0,
-      
-      basalInferoseptal: regionRestValues.basalInferoseptal[0] > 0 ? 1 : 0,
-      middleInferoseptal: regionRestValues.middleInferoseptal[0] > 0 ? 1 : 0,
-      apicalInferoseptal: regionRestValues.apicalInferoseptal[0] > 0 ? 0.5 : 0,
-      
-      basalInferior: regionRestValues.basalInferior[0] > 0 ? 1 : 0,
-      middleInferior: regionRestValues.middleInferior[0] > 0 ? 1 : 0,
-      apicalInferior: regionRestValues.apicalInferior[0] > 0 ? 1 : 0,
-      
-      basalInferolateral: regionRestValues.basalInferolateral[0] > 0 ? 1 : 0,
-      middleInferolateral: regionRestValues.middleInferolateral[0] > 0 ? 1 : 0,
-      apicalInferolateral: regionRestValues.apicalInferolateral[0] > 0 ? 0.5 : 0,
-      
-      basalAnterolateral: regionRestValues.basalAnterolateral[0] > 0 ? 1 : 0,
-      middleAnterolateral: regionRestValues.middleAnterolateral[0] > 0 ? 1 : 0,
-      apicalAnterolateral: regionRestValues.apicalAnterolateral[0] > 0 ? 0.5 : 0
-    };
-    
-    // 計算各血管區域的總面積
-    const vesselStressAreas = {
-      LAD: stressAreas.apex + 
-           stressAreas.basalAnterior + stressAreas.middleAnterior + stressAreas.apicalAnterior + 
-           stressAreas.basalAnteroseptal + stressAreas.middleAnteroseptal + stressAreas.apicalAnteroseptal,
-      
-      RCA: stressAreas.basalInferoseptal + stressAreas.middleInferoseptal + stressAreas.apicalInferoseptal + 
-           stressAreas.basalInferior + stressAreas.middleInferior + stressAreas.apicalInferior,
-      
-      LCX: stressAreas.basalInferolateral + stressAreas.middleInferolateral + stressAreas.apicalInferolateral + 
-           stressAreas.basalAnterolateral + stressAreas.middleAnterolateral + stressAreas.apicalAnterolateral
-    };
-    
-    const vesselRestAreas = {
-      LAD: restAreas.apex + 
-           restAreas.basalAnterior + restAreas.middleAnterior + restAreas.apicalAnterior + 
-           restAreas.basalAnteroseptal + restAreas.middleAnteroseptal + restAreas.apicalAnteroseptal,
-      
-      RCA: restAreas.basalInferoseptal + restAreas.middleInferoseptal + restAreas.apicalInferoseptal + 
-           restAreas.basalInferior + restAreas.middleInferior + restAreas.apicalInferior,
-      
-      LCX: restAreas.basalInferolateral + restAreas.middleInferolateral + restAreas.apicalInferolateral + 
-           restAreas.basalAnterolateral + restAreas.middleAnterolateral + restAreas.apicalAnterolateral
-    };
-    
-    // 計算綜合面積（取應力和休息的最大值）
-    const vesselOverallAreas = {
-      LAD: Math.max(stressAreas.apex, restAreas.apex) + 
-           Math.max(stressAreas.basalAnterior, restAreas.basalAnterior) + 
-           Math.max(stressAreas.middleAnterior, restAreas.middleAnterior) + 
-           Math.max(stressAreas.apicalAnterior, restAreas.apicalAnterior) + 
-           Math.max(stressAreas.basalAnteroseptal, restAreas.basalAnteroseptal) + 
-           Math.max(stressAreas.middleAnteroseptal, restAreas.middleAnteroseptal) + 
-           Math.max(stressAreas.apicalAnteroseptal, restAreas.apicalAnteroseptal),
-      
-      RCA: Math.max(stressAreas.basalInferoseptal, restAreas.basalInferoseptal) + 
-           Math.max(stressAreas.middleInferoseptal, restAreas.middleInferoseptal) + 
-           Math.max(stressAreas.apicalInferoseptal, restAreas.apicalInferoseptal) + 
-           Math.max(stressAreas.basalInferior, restAreas.basalInferior) + 
-           Math.max(stressAreas.middleInferior, restAreas.middleInferior) + 
-           Math.max(stressAreas.apicalInferior, restAreas.apicalInferior),
-      
-      LCX: Math.max(stressAreas.basalInferolateral, restAreas.basalInferolateral) + 
-           Math.max(stressAreas.middleInferolateral, restAreas.middleInferolateral) + 
-           Math.max(stressAreas.apicalInferolateral, restAreas.apicalInferolateral) + 
-           Math.max(stressAreas.basalAnterolateral, restAreas.basalAnterolateral) + 
-           Math.max(stressAreas.middleAnterolateral, restAreas.middleAnterolateral) + 
-           Math.max(stressAreas.apicalAnterolateral, restAreas.apicalAnterolateral)
-    };
-    
-    return {
-      stressAreas,
-      restAreas,
-      vesselStressAreas,
-      vesselRestAreas,
-      vesselOverallAreas
-    };
-  }
-  
-  const areaCalculations = calculateAreas();
-  
-  // 分析各區域的血流狀況
-  function analyzeVessels() {
-    const analysis = {};
-    
-    // 嚴重程度詞彙表
-    const severityTerms = {
-      "1,1": "mildly decreased perfusion",
-      "1,2": "mildly to moderately decreased perfusion",
-      "1,3": "mildly to severely decreased perfusion",
-      "2,2": "moderately decreased perfusion",
-      "2,3": "moderately to severely decreased perfusion",
-      "3,3": "severely decreased perfusion"
-    };
-    
-    // 分析每個血管區域
-    Object.keys(vesselRegions).forEach(vessel => {
-      // 提取該血管區域的應力值和休息值
-      const stressVals = vesselStressValues[vessel];
-      const restVals = vesselRestValues[vessel];
-      
-      // 計算缺損數
-      const stressDefectCount = stressVals.filter(v => v > 0).length;
-      const restDefectCount = restVals.filter(v => v > 0).length;
-      
-      // 計算嚴重程度（最小和最大非零值）
-      const nonZeroStressVals = stressVals.filter(v => v > 0);
-      const nonZeroRestVals = restVals.filter(v => v > 0);
-      
-      const stressSeverity = nonZeroStressVals.length > 0 
-        ? { min: Math.min(...nonZeroStressVals), max: Math.max(...nonZeroStressVals) }
-        : { min: 0, max: 0 };
-        
-      const restSeverity = nonZeroRestVals.length > 0
-        ? { min: Math.min(...nonZeroRestVals), max: Math.max(...nonZeroRestVals) }
-        : { min: 0, max: 0 };
-      
-      // 計算差異值
-      const differences = stressVals.map((v, i) => restVals[i] - v);
-      const isAnyPositive = differences.some(d => d > 0);
-      const isAnyNegative = differences.some(d => d < 0);
-      
-      // 確定受影響的區域
-      const affectedRegions = [];
-      vesselRegions[vessel].forEach(region => {
-        const stressHasDefect = regionStressValues[region].some(v => v > 0);
-        const restHasDefect = regionRestValues[region].some(v => v > 0);
-        
-        if (stressHasDefect || restHasDefect) {
-          // 提取基本區域名稱（去除basal/middle/apical前綴）
-          const baseRegion = region.replace(/^(basal|middle|apical)/, "").toLowerCase();
-          if (!affectedRegions.includes(baseRegion)) {
-            affectedRegions.push(baseRegion);
-          }
-        }
-      });
-      
-      // 計算區域大小字符串
-      const areaSize = areaCalculations.vesselStressAreas[vessel];
-      const areaSizeStr = areaSize < 2.5 ? "small" : areaSize < 4.5 ? "medium" : "large";
-      
-      // 計算整體區域大小
-      const overallAreaSize = areaCalculations.vesselOverallAreas[vessel];
-      const overallAreaSizeStr = overallAreaSize < 2.5 ? "small" : overallAreaSize < 4.5 ? "medium" : "large";
-      
-      // 生成嚴重程度字符串
-      const stressSeverityStr = stressSeverity.min > 0 ? `${stressSeverity.min},${stressSeverity.max}` : "0,0";
-      const restSeverityStr = restSeverity.min > 0 ? `${restSeverity.min},${restSeverity.max}` : "0,0";
-      
-      // 綜合嚴重程度（取應力和休息的較大值）
-      const overallSeverity = {
-        min: Math.max(stressSeverity.min, restSeverity.min),
-        max: Math.max(stressSeverity.max, restSeverity.max)
-      };
-      
-      const overallSeverityStr = overallSeverity.min > 0 ? `${overallSeverity.min},${overallSeverity.max}` : "0,0";
-      
-      // 搜集分析結果
-      analysis[vessel] = {
-        stressDefectCount,
-        restDefectCount,
-        stressSeverity,
-        restSeverity,
-        overallSeverity,
-        stressSeverityStr,
-        restSeverityStr,
-        overallSeverityStr,
-        severityText: stressSeverityStr !== "0,0" ? severityTerms[stressSeverityStr] || "decreased perfusion" : "",
-        restSeverityText: restSeverityStr !== "0,0" ? severityTerms[restSeverityStr] || "decreased perfusion" : "",
-        overallSeverityText: overallSeverityStr !== "0,0" ? severityTerms[overallSeverityStr] || "decreased perfusion" : "",
-        differences,
-        isAnyPositive,
-        isAnyNegative,
-        affectedRegions,
-        areaSize,
-        areaSizeStr,
-        overallAreaSize,
-        overallAreaSizeStr,
-        displayRegions: regionDisplayNames[vessel].filter(r => affectedRegions.includes(r))
-      };
-    });
-    
-    return analysis;
-  }
-  
-  const vesselAnalysis = analyzeVessels();
-  
-  // 生成發現文本
-  const findings = generateFindingsTextMPI(vesselAnalysis);
-  
-  // 生成印象文本
-  const impression = generateImpressionTextMPI(vesselAnalysis, vesselStressValues, vesselRestValues);
-  
+  // 直接返回 updateReport 的結果
   return {
-    findings: findings,
-    impression: impression
+    findings: reportResult.outputFindings,
+    impression: reportResult.outputImpression
   };
-}
-
-/**
- * 按照 MPI sample.txt 的邏輯生成發現文本
- */
-function generateFindingsTextMPI(analysis) {
-  // 獲取當前的藥物選擇
-  const medicationValue = document.getElementById('medicationSelect').value;
-  // 如果不是使用 Persantin，將 stress 改為 initial
-  const imageType = medicationValue === "Persantin" ? "stress" : "initial";
-  
-  // 嚴重程度詞彙表
-  const severityTerms = {
-    "1,1": "mildly decreased perfusion",
-    "1,2": "mildly to moderately decreased perfusion",
-    "1,3": "mildly to severely decreased perfusion",
-    "2,2": "moderately decreased perfusion",
-    "2,3": "moderately to severely decreased perfusion",
-    "3,3": "severely decreased perfusion"
-  };
-  
-  // 應力檢查發現 - 按嚴重程度分組
-  const stressFindings = {};
-  Object.keys(analysis).forEach(vessel => {
-    const data = analysis[vessel];
-    
-    if (data.stressDefectCount > 0) {
-      const severityText = data.severityText;
-      
-      if (!stressFindings[severityText]) {
-        stressFindings[severityText] = [];
-      }
-      
-      // 構建區域描述
-      const regionText = data.displayRegions.join("/") + 
-                         (data.displayRegions.length > 1 ? " regions" : " region") + 
-                         ` (${data.areaSizeStr})`;
-      
-      stressFindings[severityText].push(regionText);
-    }
-  });
-  
-  // 嚴重程度順序
-  const severityOrder = [
-    "severely decreased perfusion", 
-    "moderately to severely decreased perfusion", 
-    "moderately decreased perfusion", 
-    "mildly to severely decreased perfusion", 
-    "mildly to moderately decreased perfusion", 
-    "mildly decreased perfusion"
-  ];
-  
-  // 組合嚴重程度和區域
-  const stressDescriptions = [];
-  severityOrder.forEach(severity => {
-    if (stressFindings[severity] && stressFindings[severity].length > 0) {
-      stressDescriptions.push(`${severity} in ${formatStringArray(stressFindings[severity])}`);
-    }
-  });
-  
-  // 休息檢查再分佈發現
-  const redistributionFindings = {};
-  Object.keys(analysis).forEach(vessel => {
-    const data = analysis[vessel];
-    
-    // 跳過沒有缺損的區域
-    if (data.stressDefectCount === 0 && data.restDefectCount === 0) {
-      return;
-    }
-    
-    let redistributionPattern = "";
-    
-    // 構建區域描述
-    const regionText = data.displayRegions.join("/") + 
-                       (data.displayRegions.length > 1 ? " regions" : " region") + 
-                       ` (${data.overallAreaSizeStr})`;
-    
-    // 應力期沒有缺損，但休息期有 (反向再分佈)
-    if (data.stressDefectCount === 0 && data.restDefectCount > 0) {
-      redistributionPattern = data.restSeverityText;
-    } 
-    // 應力期有缺損
-    else if (data.stressDefectCount > 0) {
-      // 再分佈惡化 (progression)
-      if (data.isAnyPositive && !data.isAnyNegative) {
-        redistributionPattern = `progression of ${data.restSeverityText}`;
-      } 
-      // 無再分佈變化 (no redistribution)
-      else if (!data.isAnyPositive && !data.isAnyNegative) {
-        redistributionPattern = "no redistribution";
-      } 
-      // 完全再分佈恢復 (complete redistribution)
-      else if (!data.isAnyPositive && data.restDefectCount === 0) {
-        redistributionPattern = "complete redistribution";
-      } 
-      // 部分再分佈同時部分進展 (mixed pattern)
-      else if (data.isAnyPositive && data.isAnyNegative) {
-        redistributionPattern = `partial redistribution while partial progression of ${data.restSeverityText}`;
-      }
-      // 部分再分佈 (partial redistribution)
-      else {
-        redistributionPattern = "partial redistribution";
-      }
-    }
-    
-    if (redistributionPattern) {
-      if (!redistributionFindings[redistributionPattern]) {
-        redistributionFindings[redistributionPattern] = [];
-      }
-      redistributionFindings[redistributionPattern].push(regionText);
-    }
-  });
-  
-  // 再分佈模式排序
-  const redistributionOrder = [
-    "progression of severely decreased perfusion",
-    "progression of moderately to severely decreased perfusion",
-    "progression of moderately decreased perfusion",
-    "progression of mildly to severely decreased perfusion",
-    "progression of mildly to moderately decreased perfusion",
-    "progression of mildly decreased perfusion",
-    "partial redistribution while partial progression of severely decreased perfusion",
-    "partial redistribution while partial progression of moderately to severely decreased perfusion",
-    "partial redistribution while partial progression of moderately decreased perfusion",
-    "partial redistribution while partial progression of mildly to severely decreased perfusion",
-    "partial redistribution while partial progression of mildly to moderately decreased perfusion",
-    "partial redistribution while partial progression of mildly decreased perfusion",
-    "no redistribution",
-    "partial redistribution",
-    "complete redistribution",
-    "severely decreased perfusion",
-    "moderately to severely decreased perfusion",
-    "moderately decreased perfusion",
-    "mildly to severely decreased perfusion",
-    "mildly to moderately decreased perfusion",
-    "mildly decreased perfusion"
-  ];
-  
-  // 組合再分佈發現
-  const redistributionDescriptions = [];
-  
-  // 先處理合併相同模式的描述
-  const redistributionGroups = {};
-  
-  // 根據順序處理每種模式
-  redistributionOrder.forEach(pattern => {
-    // 完全匹配的模式
-    if (redistributionFindings[pattern] && redistributionFindings[pattern].length > 0) {
-      redistributionGroups[pattern] = formatStringArray(redistributionFindings[pattern]);
-    }
-    // 匹配前綴的模式，如所有以 "progression of" 或 "partial redistribution while" 開頭的
-    else if (pattern.includes("progression of") || pattern.includes("partial redistribution while")) {
-      Object.keys(redistributionFindings).forEach(key => {
-        if (key.includes(pattern) && !redistributionGroups[key]) {
-          redistributionGroups[key] = formatStringArray(redistributionFindings[key]);
-        }
-      });
-    }
-  });
-  
-  // 檢查是否有複合模式未被處理（未在predefinedOrder中的模式）
-  Object.keys(redistributionFindings).forEach(pattern => {
-    if (!Object.keys(redistributionGroups).some(group => pattern.includes(group))) {
-      // 如果有"partial redistribution while"這類的複合模式，單獨處理
-      if (pattern.includes("partial redistribution while")) {
-        redistributionGroups[pattern] = formatStringArray(redistributionFindings[pattern]);
-      }
-    }
-  });
-  
-  // 按照指定順序組合描述
-  redistributionOrder.forEach(pattern => {
-    if (redistributionGroups[pattern]) {
-      redistributionDescriptions.push(`${pattern} in ${redistributionGroups[pattern]}`);
-    }
-  });
-  
-  // 確保任何未被上面處理的pattern也加入描述中
-  Object.keys(redistributionGroups).forEach(pattern => {
-    if (!redistributionDescriptions.some(desc => desc.startsWith(pattern))) {
-      redistributionDescriptions.push(`${pattern} in ${redistributionGroups[pattern]}`);
-    }
-  });
-  
-  // 合併最終描述
-  let findingsText = "";
-  
-  if (stressDescriptions.length === 0) {
-    findingsText += `The ${imageType} images disclosed no perfusion defect.\n`;
-  } else {
-    findingsText += `The ${imageType} images disclosed ` + stressDescriptions.join("; ") + ".\n";
-  }
-  
-  // 確保所有再分佈模式都能正確顯示
-  if (redistributionDescriptions.length === 0 && Object.keys(redistributionFindings).length === 0) {
-    findingsText += "The delayed images disclosed no perfusion defect.";
-  } else {
-    findingsText += "The delayed images disclosed " + redistributionDescriptions.join("; ") + ".";
-  }
-  
-  // 當應力期和休息期都沒有缺損時，合併為一個句子
-  if (stressDescriptions.length === 0 && redistributionDescriptions.length === 0 && Object.keys(redistributionFindings).length === 0) {
-    findingsText = `The ${imageType} and delayed images disclosed no perfusion defect.`;
-  }
-
-  // 調試輸出
-  console.log("Redistribution patterns:", Object.keys(redistributionFindings));
-  console.log("Redistribution descriptions:", redistributionDescriptions);
-  
-  return findingsText;
-}
-
-/**
- * 按照 MPI sample.txt 的邏輯生成結論文本
- */
-function generateImpressionTextMPI(analysis, vesselStressValues, vesselRestValues) {
-  const diagnoses = [];
-  
-  // 先按血管區域排序：LAD、RCA、LCX
-  const vesselOrder = ["LAD", "RCA", "LCX"];
-  
-  // 診斷類型排序（由高優先級到低優先級）
-  const diagnosisTypeOrder = [
-    "myocardial ischemia",
-    "mixed viable and non-viable myocardial tissues",
-    "non-viable myocardial tissues",
-    "reverse redistribution"
-  ];
-  
-  // 按照指定順序處理血管區域
-  vesselOrder.forEach(vessel => {
-    if (!analysis[vessel]) return;
-    
-    const data = analysis[vessel];
-    
-    // 跳過沒有任何缺損的區域
-    if (data.stressDefectCount === 0 && data.restDefectCount === 0) {
-      return;
-    }
-    
-    // 生成區域描述
-    const regionText = data.displayRegions.join("/") + 
-                       (data.displayRegions.length > 1 ? " regions" : " region") + 
-                       ` (${data.overallAreaSizeStr})`;
-    
-    // 嚴重程度表述
-    const severityPrefix = data.stressSeverity.max === 1 ? "Mild" : 
-                           data.stressSeverity.max === 2 ? "Moderate" : 
-                           data.stressSeverity.max === 3 ? "Severe" : "";
-    
-    // 生成診斷描述
-    // 應力期無缺損但休息期有 (反向再分佈)
-    if (data.stressDefectCount === 0 && data.restDefectCount > 0) {
-      // 如果應力期沒有缺損，嚴重程度前綴可能為空，這時候使用休息期的嚴重程度，或者默認為"Mild"
-      const prefixToUse = severityPrefix || 
-                        (data.restSeverity.max === 2 ? "Moderate" : 
-                         data.restSeverity.max === 3 ? "Severe" : "Mild");
-      diagnoses.push({
-        type: "reverse redistribution",
-        severity: getWeightFromPrefix(prefixToUse),
-        text: `${prefixToUse} reverse redistribution in ${regionText}`,
-        vessel: vessel
-      });
-    } 
-    // 應力期有缺損
-    else if (data.stressDefectCount > 0) {
-      // 完全再分佈恢復 (complete redistribution) - 心肌缺血
-      if (!data.isAnyPositive && data.restDefectCount === 0) {
-        diagnoses.push({
-          type: "myocardial ischemia",
-          severity: getWeightFromPrefix(severityPrefix),
-          text: `${severityPrefix} myocardial ischemia in ${regionText}`,
-          vessel: vessel
-        });
-      } 
-      // 無再分佈 (no redistribution) - 非活性心肌組織
-      else if (!data.isAnyPositive && !data.isAnyNegative) {
-        diagnoses.push({
-          type: "non-viable myocardial tissues",
-          severity: getWeightFromPrefix(severityPrefix),
-          text: `${severityPrefix} non-viable myocardial tissues in ${regionText}`,
-          vessel: vessel
-        });
-      } 
-      // 部分再分佈或進展 - 混合活性和非活性組織
-      else {
-        diagnoses.push({
-          type: "mixed viable and non-viable myocardial tissues",
-          severity: getWeightFromPrefix(severityPrefix),
-          text: `${severityPrefix} mixed viable and non-viable myocardial tissues in ${regionText}`,
-          vessel: vessel
-        });
-      }
-    }
-  });
-  
-  // 如果沒有診斷，表示正常
-  if (diagnoses.length === 0) {
-    return "Normal myocardial perfusion study.";
-  }
-  
-  // 按多級排序：1.嚴重程度 2.診斷類型 3.血管區域
-  const sortedDiagnoses = diagnoses.sort((a, b) => {
-    // 計算每個診斷的綜合分數（加權合計）
-    function calculateScore(diagnosis) {
-      // 從原始數據中獲取stress和rest的值
-      const vessel = diagnosis.vessel;
-      // 使用傳入的參數而非全局變數
-      const stressVals = vesselStressValues[vessel]; // 取得所有segment的值
-      const restVals = vesselRestValues[vessel]; // 取得所有segment的值
-      
-      // stress圖像權重更高 (stress係數3，rest係數1)
-      const stressWeight = 3;
-      const restWeight = 1;
-      
-      // 計算加權總和的嚴重程度 (對每個segment進行加總)
-      let severitySum = 0;
-      for (let i = 0; i < stressVals.length; i++) {
-        severitySum += stressVals[i] * stressWeight;
-      }
-      for (let i = 0; i < restVals.length; i++) {
-        severitySum += restVals[i] * restWeight;
-      }
-      const severityScore = severitySum * 15; // 總分值權重調整
-      
-      // 區域大小權重：large(3分) > medium(2分) > small(1分)
-      const sizeScore = diagnosis.text.includes("large") ? 30 :
-                        diagnosis.text.includes("medium") ? 20 : 10;
-      
-      // 診斷類型權重：缺血(4分) > 混合組織(3分) > 非活性組織(2分) > 反向再分佈(1分)
-      const typeOrder = diagnosisTypeOrder.indexOf(diagnosis.type);
-      const typeScore = (4 - typeOrder) * 10; // 類型得分，最高40分
-      
-      // 血管區域重要性：LAD(3分) > RCA(2分) > LCX(1分)
-      const vesselScore = (3 - vesselOrder.indexOf(diagnosis.vessel));
-      
-      console.log(`Diagnosis: ${diagnosis.text}, Stress總和: ${stressVals.reduce((a, b) => a + b, 0)}, Rest總和: ${restVals.reduce((a, b) => a + b, 0)}, Score: ${severityScore + typeScore + sizeScore + vesselScore}`);
-      
-      // 綜合分數
-      return severityScore + typeScore + sizeScore + vesselScore;
-    }
-    
-    // 根據加權總分排序（降序）
-    return calculateScore(b) - calculateScore(a);
-  });
-  
-  // 加上編號並組合最終文本
-  return sortedDiagnoses
-    .map((diagnosis, index) => `${index + 1}. ${capitalizeFirstCharacter(diagnosis.text)}.`)
-    .join("\n");
-}
-
-/**
- * 根據嚴重程度前綴獲取權重值
- * @param {string} prefix - 嚴重程度前綴
- * @returns {number} 權重值
- */
-function getWeightFromPrefix(prefix) {
-  if (prefix.startsWith("Severe")) return 3;
-  if (prefix.startsWith("Moderate")) return 2;
-  if (prefix.startsWith("Mild")) return 1;
-  return 0;
 }
 
 /**
@@ -922,44 +294,6 @@ function formatStringArray(arr, txtSplit = ", ", txtJunction = "and") {
 }
 
 /**
- * 判斷數組中是否有大於零的元素
- * @param {number[]} arr - 數字數組
- * @returns {boolean} 如果數組中有大於零的元素，則返回 true
- */
-function isAnyElementGreaterThanZero(arr) {
-  return arr.some(element => element > 0);
-}
-
-/**
- * 判斷數組中是否有小於零的元素
- * @param {number[]} arr - 數字數組
- * @returns {boolean} 如果數組中有小於零的元素，則返回 true
- */
-function isAnyElementLessThanZero(arr) {
-  return arr.some(element => element < 0);
-}
-
-/**
- * 合併兩個數組並去除重複項
- * @param {Array} arr1 - 第一個數組
- * @param {Array} arr2 - 第二個數組
- * @returns {Array} 合併後無重複的數組
- */
-function mergeAndRemoveDuplicates(arr1, arr2) {
-  return Array.from(new Set(arr1.concat(arr2)));
-}
-
-/**
- * 比較兩個數組的對應元素，返回較大的元素
- * @param {number[]} arr1 - 第一個數組
- * @param {number[]} arr2 - 第二個數組
- * @returns {number[]} 每個位置取較大值的新數組
- */
-function compareArraysAndReturnLargerElements(arr1, arr2) {
-  return arr1.map((element, index) => Math.max(element, arr2[index] || 0));
-}
-
-/**
  * 將句子首字母大寫
  * @param {string} str - 輸入句子
  * @returns {string} 首字母大寫的句子
@@ -991,3 +325,544 @@ function updateAddendumText(impressionText) {
     addendumBox.textContent = "";
   }
 } 
+
+function updateReport(values) {
+
+  // 壓力(stress)測試的值
+  var valueStressApex = values["valueStressApex"];
+  var valueStressBasalAnterior = values["valueStressBasalAnterior"];
+  var valueStressMiddleAnterior = values["valueStressMiddleAnterior"];
+  var valueStressApicalAnterior = values["valueStressApicalAnterior"];
+  var valueStressBasalAnteroseptal = values["valueStressBasalAnteroseptal"];
+  var valueStressMiddleAnteroseptal = values["valueStressMiddleAnteroseptal"];
+  var valueStressApicalAnteroseptal = values["valueStressApicalAnteroseptal"];
+  var valueStressBasalInferoseptal = values["valueStressBasalInferoseptal"];
+  var valueStressMiddleInferoseptal = values["valueStressMiddleInferoseptal"];
+  var valueStressApicalInferoseptal = values["valueStressApicalInferoseptal"];
+  var valueStressBasalInferior = values["valueStressBasalInferior"];
+  var valueStressMiddleInfterior = values["valueStressMiddleInfterior"];
+  var valueStressApicalInfterior = values["valueStressApicalInfterior"];
+  var valueStressBasalInferolateral = values["valueStressBasalInferolateral"];
+  var valueStressMiddleInferolateral = values["valueStressMiddleInferolateral"];
+  var valueStressApicalInferolateral = values["valueStressApicalInferolateral"];
+  var valueStressBasalAnterolateral = values["valueStressBasalAnterolateral"];
+  var valueStressMiddleAnterolateral = values["valueStressMiddleAnterolateral"];
+  var valueStressApicalAnterolateral = values["valueStressApicalAnterolateral"];
+  
+  // 休息(rest)測試的值
+  var valueRestApex = values["valueRestApex"];
+  var valueRestBasalAnterior = values["valueRestBasalAnterior"];
+  var valueRestMiddleAnterior = values["valueRestMiddleAnterior"];
+  var valueRestApicalAnterior = values["valueRestApicalAnterior"];
+  var valueRestBasalAnteroseptal = values["valueRestBasalAnteroseptal"];
+  var valueRestMiddleAnteroseptal = values["valueRestMiddleAnteroseptal"];
+  var valueRestApicalAnteroseptal = values["valueRestApicalAnteroseptal"];
+  var valueRestBasalInferoseptal = values["valueRestBasalInferoseptal"];
+  var valueRestMiddleInferoseptal = values["valueRestMiddleInferoseptal"];
+  var valueRestApicalInferoseptal = values["valueRestApicalInferoseptal"];
+  var valueRestBasalInferior = values["valueRestBasalInferior"];
+  var valueRestMiddleInfterior = values["valueRestMiddleInfterior"];
+  var valueRestApicalInfterior = values["valueRestApicalInfterior"];
+  var valueRestBasalInferolateral = values["valueRestBasalInferolateral"];
+  var valueRestMiddleInferolateral = values["valueRestMiddleInferolateral"];
+  var valueRestApicalInferolateral = values["valueRestApicalInferolateral"];
+  var valueRestBasalAnterolateral = values["valueRestBasalAnterolateral"];
+  var valueRestMiddleAnterolateral = values["valueRestMiddleAnterolateral"];
+  var valueRestApicalAnterolateral = values["valueRestApicalAnterolateral"];
+
+  var valuesStressApex = [valueStressApex];
+  var valuesStressAnterior = [valueStressBasalAnterior, valueStressMiddleAnterior, valueStressApicalAnterior];
+  var valuesStressAnteroseptal = [valueStressBasalAnteroseptal, valueStressMiddleAnteroseptal, valueStressApicalAnteroseptal];
+  var valuesStressInferoseptal = [valueStressBasalInferoseptal, valueStressMiddleInferoseptal, valueStressApicalInferoseptal];
+  var valuesStressInferior = [valueStressBasalInferior, valueStressMiddleInfterior, valueStressApicalInfterior];
+  var valuesStressInferolateral = [valueStressBasalInferolateral, valueStressMiddleInferolateral, valueStressApicalInferolateral];
+  var valuesStressAnterolateral = [valueStressBasalAnterolateral, valueStressMiddleAnterolateral, valueStressApicalAnterolateral];
+
+  var valuesRestApex = [valueRestApex];
+  var valuesRestAnterior = [valueRestBasalAnterior, valueRestMiddleAnterior, valueRestApicalAnterior];
+  var valuesRestAnteroseptal = [valueRestBasalAnteroseptal, valueRestMiddleAnteroseptal, valueRestApicalAnteroseptal];
+  var valuesRestInferoseptal = [valueRestBasalInferoseptal, valueRestMiddleInferoseptal, valueRestApicalInferoseptal];
+  var valuesRestInferior = [valueRestBasalInferior, valueRestMiddleInfterior, valueRestApicalInfterior];
+  var valuesRestInferolateral = [valueRestBasalInferolateral, valueRestMiddleInferolateral, valueRestApicalInferolateral];
+  var valuesRestAnterolateral = [valueRestBasalAnterolateral, valueRestMiddleAnterolateral, valueRestApicalAnterolateral];
+
+  var dicStress = {
+    "apex": valuesStressApex,
+    "anterior": valuesStressAnterior,
+    "anteroseptal": valuesStressAnteroseptal,
+    "inferoseptal": valuesStressInferoseptal,
+    "inferior": valuesStressInferior,
+    "inferolateral": valuesStressInferolateral,
+    "anterolateral": valuesStressAnterolateral
+  }
+
+  var dicRest = {
+    "apex": valuesRestApex,
+    "anterior": valuesRestAnterior,
+    "anteroseptal": valuesRestAnteroseptal,
+    "inferoseptal": valuesRestInferoseptal,
+    "inferior": valuesRestInferior,
+    "inferolateral": valuesRestInferolateral,
+    "anterolateral": valuesRestAnterolateral
+  }
+
+  var regionStressLAD = ['anterior', 'anteroseptal', 'apex'].filter(x => dicStress[x].filter(y => y > 0).length > 0);
+  var regionStressRCA = ['inferoseptal', 'inferior'].filter(x => dicStress[x].filter(y => y > 0).length > 0);
+  var regionStressLCX = ['inferolateral', 'anterolateral'].filter(x => dicStress[x].filter(y => y > 0).length > 0);
+  var regionRestLAD = ['anterior', 'anteroseptal', 'apex'].filter(x => dicRest[x].filter(y => y > 0).length > 0);
+  var regionRestRCA = ['inferoseptal', 'inferior'].filter(x => dicRest[x].filter(y => y > 0).length > 0);
+  var regionRestLCX = ['inferolateral', 'anterolateral'].filter(x => dicRest[x].filter(y => y > 0).length > 0);
+
+  // calulate areas
+
+  var areaStressApex = valueStressApex > 0 ? 1 : 0;
+  var areaStressBasalAnterior = valueStressBasalAnterior > 0 ? 1 : 0;
+  var areaStressMiddleAnterior = valueStressMiddleAnterior > 0 ? 1 : 0;
+  var areaStressApicalAnterior = valueStressApicalAnterior > 0 ? 1 : 0;
+  var areaStressBasalAnteroseptal = valueStressBasalAnteroseptal > 0 ? 1 : 0;
+  var areaStressMiddleAnteroseptal = valueStressMiddleAnteroseptal > 0 ? 1 : 0;
+  var areaStressApicalAnteroseptal = valueStressApicalAnteroseptal > 0 ? 0.5 : 0;
+
+  var areaStressBasalInferoseptal = valueStressBasalInferoseptal > 0 ? 1 : 0;
+  var areaStressMiddleInferoseptal = valueStressMiddleInferoseptal > 0 ? 1 : 0;
+  var areaStressApicalInferoseptal = valueStressApicalInferoseptal > 0 ? 0.5 : 0;
+  var areaStressBasalInferior = valueStressBasalInferior > 0 ? 1 : 0;
+  var areaStressMiddleInfterior = valueStressMiddleInfterior > 0 ? 1 : 0;
+  var areaStressApicalInfterior = valueStressApicalInfterior > 0 ? 1 : 0;
+
+  var areaStressBasalInferolateral = valueStressBasalInferolateral > 0 ? 1 : 0;
+  var areaStressMiddleInferolateral = valueStressMiddleInferolateral > 0 ? 1 : 0;
+  var areaStressApicalInferolateral = valueStressApicalInferolateral > 0 ? 0.5 : 0;
+  var areaStressBasalAnterolateral = valueStressBasalAnterolateral > 0 ? 1 : 0;
+  var areaStressMiddleAnterolateral = valueStressMiddleAnterolateral > 0 ? 1 : 0;
+  var areaStressApicalAnterolateral = valueStressApicalAnterolateral > 0 ? 0.5 : 0;
+
+  var areaRestApex = valueRestApex > 0 ? 1 : 0;
+  var areaRestBasalAnterior = valueRestBasalAnterior > 0 ? 1 : 0;
+  var areaRestMiddleAnterior = valueRestMiddleAnterior > 0 ? 1 : 0;
+  var areaRestApicalAnterior = valueRestApicalAnterior > 0 ? 1 : 0;
+  var areaRestBasalAnteroseptal = valueRestBasalAnteroseptal > 0 ? 1 : 0;
+  var areaRestMiddleAnteroseptal = valueRestMiddleAnteroseptal > 0 ? 1 : 0;
+  var areaRestApicalAnteroseptal = valueRestApicalAnteroseptal > 0 ? 0.5 : 0;
+
+  var areaRestBasalInferoseptal = valueRestBasalInferoseptal > 0 ? 1 : 0;
+  var areaRestMiddleInferoseptal = valueRestMiddleInferoseptal > 0 ? 1 : 0;
+  var areaRestApicalInferoseptal = valueRestApicalInferoseptal > 0 ? 0.5 : 0;
+  var areaRestBasalInferior = valueRestBasalInferior > 0 ? 1 : 0;
+  var areaRestMiddleInfterior = valueRestMiddleInfterior > 0 ? 1 : 0;
+  var areaRestApicalInfterior = valueRestApicalInfterior > 0 ? 1 : 0;
+
+  var areaRestBasalInferolateral = valueRestBasalInferolateral > 0 ? 1 : 0;
+  var areaRestMiddleInferolateral = valueRestMiddleInferolateral > 0 ? 1 : 0;
+  var areaRestApicalInferolateral = valueRestApicalInferolateral > 0 ? 0.5 : 0;
+  var areaRestBasalAnterolateral = valueRestBasalAnterolateral > 0 ? 1 : 0;
+  var areaRestMiddleAnterolateral = valueRestMiddleAnterolateral > 0 ? 1 : 0;
+  var areaRestApicalAnterolateral = valueRestApicalAnterolateral > 0 ? 0.5 : 0;
+
+  var areaStressLAD = areaStressApex + areaStressBasalAnterior + areaStressMiddleAnterior + areaStressApicalAnterior + areaStressBasalAnteroseptal + areaStressMiddleAnteroseptal + areaStressApicalAnteroseptal;
+  var areaStressRCA = areaStressBasalInferoseptal + areaStressMiddleInferoseptal + areaStressApicalInferoseptal + areaStressBasalInferior + areaStressMiddleInfterior + areaStressApicalInfterior;
+  var areaStressLCX = areaStressBasalInferolateral + areaStressMiddleInferolateral + areaStressApicalInferolateral + areaStressBasalAnterolateral + areaStressMiddleAnterolateral + areaStressApicalAnterolateral;
+  var areaRestLAD = areaRestApex + areaRestBasalAnterior + areaRestMiddleAnterior + areaRestApicalAnterior + areaRestBasalAnteroseptal + areaRestMiddleAnteroseptal + areaRestApicalAnteroseptal;
+  var areaRestRCA = areaRestBasalInferoseptal + areaRestMiddleInferoseptal + areaRestApicalInferoseptal + areaRestBasalInferior + areaRestMiddleInfterior + areaRestApicalInfterior;
+  var areaRestLCX = areaRestBasalInferolateral + areaRestMiddleInferolateral + areaRestApicalInferolateral + areaRestBasalAnterolateral + areaRestMiddleAnterolateral + areaRestApicalAnterolateral;
+
+  // calulate severities
+  var severityStressLAD = valuesStressApex.concat(valuesStressAnterior).concat(valuesStressAnteroseptal);
+  var severityStressRCA = valuesStressInferoseptal.concat(valuesStressInferior);
+  var severityStressLCX = valuesStressInferolateral.concat(valuesStressAnterolateral);
+  var severityRestLAD = valuesRestApex.concat(valuesRestAnterior).concat(valuesRestAnteroseptal);
+  var severityRestRCA = valuesRestInferoseptal.concat(valuesRestInferior);
+  var severityRestLCX = valuesRestInferolateral.concat(valuesRestAnterolateral);
+
+  // Assuming findMinimum, findMaximum, and sumArray functions are already defined
+
+  var severityStressLADString = sumArray(severityStressLAD) == 0 ? "0,0" : findMinimum(severityStressLAD.filter(x => x > 0)) + "," + findMaximum(severityStressLAD.filter(x => x > 0));
+  var severityStressRCAString = sumArray(severityStressRCA) == 0 ? "0,0" : findMinimum(severityStressRCA.filter(x => x > 0)) + "," + findMaximum(severityStressRCA.filter(x => x > 0));
+  var severityStressLCXString = sumArray(severityStressLCX) == 0 ? "0,0" : findMinimum(severityStressLCX.filter(x => x > 0)) + "," + findMaximum(severityStressLCX.filter(x => x > 0));
+  var severityRestLADString = sumArray(severityRestLAD) == 0 ? "0,0" : findMinimum(severityRestLAD.filter(x => x > 0)) + "," + findMaximum(severityRestLAD.filter(x => x > 0));
+  var severityRestRCAString = sumArray(severityRestRCA) == 0 ? "0,0" : findMinimum(severityRestRCA.filter(x => x > 0)) + "," + findMaximum(severityRestRCA.filter(x => x > 0));
+  var severityRestLCXString = sumArray(severityRestLCX) == 0 ? "0,0" : findMinimum(severityRestLCX.filter(x => x > 0)) + "," + findMaximum(severityRestLCX.filter(x => x > 0));
+
+  // Example of how to use these strings to get values from dicFindingsSeverity
+
+  var dicFindingsSeverity = {
+    "0,0": "",
+    "1,1": "mildly decreased perfusion",
+    "1,2": "mildly to moderately decreased perfusion",
+    "1,3": "mildly to severely decreased perfusion",
+    "2,2": "moderately decreased perfusion",
+    "2,3": "moderately to severely decreased perfusion",
+    "3,3": "severely decreased perfusion"
+  };
+
+  var findingStressLAD = severityStressLADString == "0,0" ? "" : dicFindingsSeverity[severityStressLADString] + " in " + regionStressLAD.join("/") + " (" + (areaStressLAD < 2.5 ? "small" : areaStressLAD < 4.5 ? "medium" : "large") + ")";
+  var findingStressRCA = severityStressRCAString == "0,0" ? "" : dicFindingsSeverity[severityStressRCAString] + " in " + regionStressRCA.join("/") + " (" + (areaStressRCA < 2.5 ? "small" : areaStressRCA < 4.5 ? "medium" : "large") + ")";
+  var findingStressLCX = severityStressLCXString == "0,0" ? "" : dicFindingsSeverity[severityStressLCXString] + " in " + regionStressLCX.join("/") + " (" + (areaStressLCX < 2.5 ? "small" : areaStressLCX < 4.5 ? "medium" : "large") + ")";
+
+  var findingRestLAD = severityRestLADString == "0,0" ? "" : dicFindingsSeverity[severityRestLADString] + " in " + regionRestLAD.join("/") + " (" + (areaRestLAD < 2.5 ? "small" : areaRestLAD < 4.5 ? "medium" : "large") + ")";
+  var findingRestRCA = severityRestRCAString == "0,0" ? "" : dicFindingsSeverity[severityRestRCAString] + " in " + regionRestRCA.join("/") + " (" + (areaRestRCA < 2.5 ? "small" : areaRestRCA < 4.5 ? "medium" : "large") + ")";
+  var findingRestLCX = severityRestLCXString == "0,0" ? "" : dicFindingsSeverity[severityRestLCXString] + " in " + regionRestLCX.join("/") + " (" + (areaRestLCX < 2.5 ? "small" : areaRestLCX < 4.5 ? "medium" : "large") + ")";
+
+  findingStressLAD = findingStressLAD == "" ? "" : findingStressLAD.includes("/") ? findingStressLAD + " regions" : findingStressLAD + " region";
+  findingStressRCA = findingStressRCA == "" ? "" : findingStressRCA.includes("/") ? findingStressRCA + " regions" : findingStressRCA + " region";
+  findingStressLCX = findingStressLCX == "" ? "" : findingStressLCX.includes("/") ? findingStressLCX + " regions" : findingStressLCX + " region";
+  findingRestLAD = findingRestLAD == "" ? "" : findingRestLAD.includes("/") ? findingRestLAD + " regions" : findingRestLAD + " region";
+  findingRestRCA = findingRestRCA == "" ? "" : findingRestRCA.includes("/") ? findingRestRCA + " regions" : findingRestRCA + " region";
+  findingRestLCX = findingRestLCX == "" ? "" : findingRestLCX.includes("/") ? findingRestLCX + " regions" : findingRestLCX + " region";
+
+  var findingStress = [findingStressLAD, findingStressRCA, findingStressLCX].filter(x => x != "");
+  var dictionaryFindingStress = {};
+
+  for (let i = 0; i < findingStress.length; i++) {
+    let currentSeverity = findingStress[i].split(" in ")[0];
+    let currentRegion = findingStress[i].split(" in ")[1];
+    if (Object.keys(dictionaryFindingStress).includes(currentSeverity)) {
+      dictionaryFindingStress[currentSeverity].push(currentRegion);
+    } else {
+      dictionaryFindingStress[currentSeverity] = [currentRegion];
+    }
+  }
+  var severityOrder = ["severely decreased perfusion", "moderately to severely decreased perfusion", "moderately decreased perfusion", "mildly to severely decreased perfusion", "mildly to moderately decreased perfusion", "mildly decreased perfusion"];
+  var severityGroupedFindings = [];
+  for (let i = 0; i < severityOrder.length; i++) {
+    if (Object.keys(dictionaryFindingStress).includes(severityOrder[i])) {
+      severityGroupedFindings.push(severityOrder[i] + " in " + formatStringArray(dictionaryFindingStress[severityOrder[i]], txtSplit = ",", txtJucntion = "and"))
+    }
+  }
+
+  var textSeverityGroupedFindings = severityGroupedFindings.join("; ");
+
+  var differenceApex = valueRestApex - valueStressApex;
+  var differenceBasalAnterior = valueRestBasalAnterior - valueStressBasalAnterior;
+  var differenceMiddleAnterior = valueRestMiddleAnterior - valueStressMiddleAnterior;
+  var differenceApicalAnterior = valueRestApicalAnterior - valueStressApicalAnterior;
+  var differenceBasalAnteroseptal = valueRestBasalAnteroseptal - valueStressBasalAnteroseptal;
+  var differenceMiddleAnteroseptal = valueRestMiddleAnteroseptal - valueStressMiddleAnteroseptal;
+  var differenceApicalAnteroseptal = valueRestApicalAnteroseptal - valueStressApicalAnteroseptal;
+  var differenceBasalInferoseptal = valueRestBasalInferoseptal - valueStressBasalInferoseptal;
+  var differenceMiddleInferoseptal = valueRestMiddleInferoseptal - valueStressMiddleInferoseptal;
+  var differenceApicalInferoseptal = valueRestApicalInferoseptal - valueStressApicalInferoseptal;
+  var differenceBasalInferior = valueRestBasalInferior - valueStressBasalInferior;
+  var differenceMiddleInfterior = valueRestMiddleInfterior - valueStressMiddleInfterior;
+  var differenceApicalInfterior = valueRestApicalInfterior - valueStressApicalInfterior;
+  var differenceBasalInferolateral = valueRestBasalInferolateral - valueStressBasalInferolateral;
+  var differenceMiddleInferolateral = valueRestMiddleInferolateral - valueStressMiddleInferolateral;
+  var differenceApicalInferolateral = valueRestApicalInferolateral - valueStressApicalInferolateral;
+  var differenceBasalAnterolateral = valueRestBasalAnterolateral - valueStressBasalAnterolateral;
+  var differenceMiddleAnterolateral = valueRestMiddleAnterolateral - valueStressMiddleAnterolateral;
+  var differenceApicalAnterolateral = valueRestApicalAnterolateral - valueStressApicalAnterolateral;
+
+  var differencesApex = [differenceApex];
+  var differencesAnterior = [differenceBasalAnterior, differenceMiddleAnterior, differenceApicalAnterior];
+  var differencesAnteroseptal = [differenceBasalAnteroseptal, differenceMiddleAnteroseptal, differenceApicalAnteroseptal];
+  var differencesInferoseptal = [differenceBasalInferoseptal, differenceMiddleInferoseptal, differenceApicalInferoseptal];
+  var differencesInferior = [differenceBasalInferior, differenceMiddleInfterior, differenceApicalInfterior];
+  var differencesInferolateral = [differenceBasalInferolateral, differenceMiddleInferolateral, differenceApicalInferolateral];
+  var differencesAnterolateral = [differenceBasalAnterolateral, differenceMiddleAnterolateral, differenceApicalAnterolateral];
+
+  var differencesLAD = differencesApex.concat(differencesAnterior).concat(differencesAnteroseptal);
+  var differencesRCA = differencesInferoseptal.concat(differencesInferior);
+  var differencesLCX = differencesInferolateral.concat(differencesAnterolateral);
+
+  // lesion regions of (Stress | Rest)
+  var regionOverallLAD = mergeAndRemoveDuplicates(regionStressLAD, regionRestLAD);
+  var regionOverallRCA = mergeAndRemoveDuplicates(regionStressRCA, regionRestRCA);
+  var regionOverallLCX = mergeAndRemoveDuplicates(regionStressLCX, regionRestLCX);
+
+  var areaOverallLAD =
+    Math.max(areaStressApex, areaRestApex) +
+    Math.max(areaStressBasalAnterior, areaRestBasalAnterior) +
+    Math.max(areaStressMiddleAnterior, areaRestMiddleAnterior) +
+    Math.max(areaStressApicalAnterior, areaRestApicalAnterior) +
+    Math.max(areaStressBasalAnteroseptal, areaRestBasalAnteroseptal) +
+    Math.max(areaStressMiddleAnteroseptal, areaRestMiddleAnteroseptal) +
+    Math.max(areaStressApicalAnteroseptal, areaRestApicalAnteroseptal);
+
+  var areaOverallRCA =
+    Math.max(areaStressBasalInferoseptal, areaRestBasalInferoseptal) +
+    Math.max(areaStressMiddleInferoseptal, areaRestMiddleInferoseptal) +
+    Math.max(areaStressApicalInferoseptal, areaRestApicalInferoseptal) +
+    Math.max(areaStressBasalInferior, areaRestBasalInferior) +
+    Math.max(areaStressMiddleInfterior, areaRestMiddleInfterior) +
+    Math.max(areaStressApicalInfterior, areaRestApicalInfterior);
+
+  var areaOverallLCX =
+    Math.max(areaStressBasalInferolateral, areaRestBasalInferolateral) +
+    Math.max(areaStressMiddleInferolateral, areaRestMiddleInferolateral) +
+    Math.max(areaStressApicalInferolateral, areaRestApicalInferolateral) +
+    Math.max(areaStressBasalAnterolateral, areaRestBasalAnterolateral) +
+    Math.max(areaStressMiddleAnterolateral, areaRestMiddleAnterolateral) +
+    Math.max(areaStressApicalAnterolateral, areaRestApicalAnterolateral);
+
+  var severityOverallLAD = compareArraysAndReturnLargerElements(severityStressLAD, severityRestLAD);
+  var severityOverallRCA = compareArraysAndReturnLargerElements(severityStressRCA, severityRestRCA);
+  var severityOverallLCX = compareArraysAndReturnLargerElements(severityStressLCX, severityRestLCX);
+
+  var severityOverallLADString = sumArray(severityOverallLAD) == 0 ? "0,0" : findMinimum(severityOverallLAD.filter(x => x > 0)) + "," + findMaximum(severityOverallLAD.filter(x => x > 0));
+  var severityOverallRCAString = sumArray(severityOverallRCA) == 0 ? "0,0" : findMinimum(severityOverallRCA.filter(x => x > 0)) + "," + findMaximum(severityOverallRCA.filter(x => x > 0));
+  var severityOverallLCXString = sumArray(severityOverallLCX) == 0 ? "0,0" : findMinimum(severityOverallLCX.filter(x => x > 0)) + "," + findMaximum(severityOverallLCX.filter(x => x > 0));
+
+  var textDifferencesLAD =
+    findingStressLAD == "" ? findingRestLAD :
+      isAnyElementGreaterThanZero(differencesLAD) && !isAnyElementLessThanZero(differencesLAD) ? "progression of " + findingRestLAD :
+        isAnyElementGreaterThanZero(differencesLAD) ? "partial redistribution while partial progression of " + dicFindingsSeverity[severityOverallLADString] + " in " + regionOverallLAD.join("/") + " (" + (areaOverallLAD < 2.5 ? "small" : areaOverallLAD < 4.5 ? "medium" : "large") + ")" + (regionOverallLAD.length > 1 ? " regions" : " region") :
+          !isAnyElementGreaterThanZero(differencesLAD) && !isAnyElementLessThanZero(differencesLAD) ? "no redistribution in " + regionOverallLAD.join("/") + (regionOverallLAD.length > 1 ? " regions" : " region") :
+            !isAnyElementGreaterThanZero(differencesLAD) && sumArray(severityRestLAD) == 0 ? "complete redistribution in " + regionOverallLAD.join("/") + (regionOverallLAD.length > 1 ? " regions" : " region") :
+              "partial redistribution in " + regionOverallLAD.join("/") + (regionOverallLAD.length > 1 ? " regions" : " region");
+
+
+
+  var textDifferencesRCA =
+    findingStressRCA == "" ? findingRestRCA :
+      isAnyElementGreaterThanZero(differencesRCA) && !isAnyElementLessThanZero(differencesRCA) ? "progression of " + findingRestRCA :
+        isAnyElementGreaterThanZero(differencesRCA) ? "partial redistribution while partial progression of " + dicFindingsSeverity[severityOverallRCAString] + " in " + regionOverallRCA.join("/") + " (" + (areaOverallRCA < 2.5 ? "small" : areaOverallRCA < 4.5 ? "medium" : "large") + ")" + (regionOverallRCA.length > 1 ? " regions" : " region") :
+          !isAnyElementGreaterThanZero(differencesRCA) && !isAnyElementLessThanZero(differencesRCA) ? "no redistribution in " + regionOverallRCA.join("/") + (regionOverallRCA.length > 1 ? " regions" : " region") :
+            !isAnyElementGreaterThanZero(differencesRCA) && sumArray(severityRestRCA) == 0 ? "complete redistribution in " + regionOverallRCA.join("/") + (regionOverallRCA.length > 1 ? " regions" : " region") :
+              "partial redistribution in " + regionOverallRCA.join("/") + (regionOverallRCA.length > 1 ? " regions" : " region");
+
+
+
+  var textDifferencesLCX =
+    findingStressLCX == "" ? findingRestLCX :
+      isAnyElementGreaterThanZero(differencesLCX) && !isAnyElementLessThanZero(differencesLCX) ? "progression of " + findingRestLCX :
+        isAnyElementGreaterThanZero(differencesLCX) ? "partial redistribution while partial progression of " + dicFindingsSeverity[severityOverallLCXString] + " in " + regionOverallLCX.join("/") + " (" + (areaOverallLCX < 2.5 ? "small" : areaOverallLCX < 4.5 ? "medium" : "large") + ")" + (regionOverallLCX.length > 1 ? " regions" : " region") :
+          !isAnyElementGreaterThanZero(differencesLCX) && !isAnyElementLessThanZero(differencesLCX) ? "no redistribution in " + regionOverallLCX.join("/") + (regionOverallLCX.length > 1 ? " regions" : " region") :
+            !isAnyElementGreaterThanZero(differencesLCX) && sumArray(severityRestLCX) == 0 ? "complete redistribution in " + regionOverallLCX.join("/") + (regionOverallLCX.length > 1 ? " regions" : " region") :
+              "partial redistribution in " + regionOverallLCX.join("/") + (regionOverallLCX.length > 1 ? " regions" : " region");
+
+  var dictionaryDifferences = {};
+
+  for (let i of [textDifferencesLAD, textDifferencesRCA, textDifferencesLCX]) {
+
+    let currentDifference = i.split(" in ")[0];
+    let currentRegion = i.split(" in ")[1];
+    if (Object.keys(dictionaryDifferences).includes(currentDifference)) {
+      dictionaryDifferences[currentDifference].push(currentRegion);
+    } else {
+      dictionaryDifferences[currentDifference] = [currentRegion];
+    }
+
+  }
+
+
+  differenceOrder = [
+    "progression of severely decreased perfusion",
+    "progression of moderately to severely decreased perfusion",
+    "progression of moderately decreased perfusion",
+    "progression of mildly to severely decreased perfusion",
+    "progression of mildly to moderately decreased perfusion",
+    "progression of mildly decreased perfusion",
+    "partial redistribution while partial progression of severely decreased perfusion",
+    "partial redistribution while partial progression of moderately to severely decreased perfusion",
+    "partial redistribution while partial progression of moderately decreased perfusion",
+    "partial redistribution while partial progression of mildly to severely decreased perfusion",
+    "partial redistribution while partial progression of mildly to moderately decreased perfusion",
+    "partial redistribution while partial progression of mildly decreased perfusion",
+    "no redistribution",
+    "partial redistribution",
+    "complete redistribution",
+    "severely decreased perfusion",
+    "moderately to severely decreased perfusion",
+    "moderately decreased perfusion",
+    "mildly to severely decreased perfusion",
+    "mildly to moderately decreased perfusion",
+    "mildly decreased perfusion",
+  ]
+
+  // var flagJoin = false;
+  var differencesGroupedFindings = [];
+  var differencesGroupedFindingsNew = [];
+  for (let i of differenceOrder) {
+    if (Object.keys(dictionaryDifferences).includes(i)) {
+      differencesGroupedFindings.push(i + " in " + formatStringArray(dictionaryDifferences[i], txtSplit = ",", txtJucntion = "and"))
+    }
+  }
+
+
+
+  var variantsProgression = differencesGroupedFindings.filter(x => x.slice(0, 11) == "progression");
+  var polyProgression = variantsProgression.filter(x => x.includes("and")).length > 0;
+  var differencesGroupedProgressionFindings = formatStringArray(variantsProgression.map(x => x.replace("progression of ", "")), txtSplit = ",", txtJucntion = (polyProgression ? ", and" : "and")).replace(" ,", ",");
+  if (differencesGroupedProgressionFindings.length > 0) {
+    differencesGroupedFindingsNew.push("progression of " + differencesGroupedProgressionFindings);
+  }
+
+  var variantsWhile = differencesGroupedFindings.filter(x => x.includes("partial redistribution while"));
+
+  var polyWhile = variantsWhile.filter(x => x.includes("and")).length > 0;
+  var differencesGroupedWhileFindings = formatStringArray(variantsWhile.map(x => x.replace("partial redistribution while partial progression of ", "")), txtSplit = ";", txtJucntion = (polyWhile ? ", and" : "and")).replace(" ,", ",");
+  if (differencesGroupedWhileFindings.length > 0) {
+    differencesGroupedFindingsNew.push("partial redistribution while partial progression of " + differencesGroupedWhileFindings);
+  }
+  differencesGroupedFindingsNew = differencesGroupedFindingsNew
+    .concat(differencesGroupedFindings.filter(x => x.includes("no redistribution")))
+    .concat(differencesGroupedFindings.filter(x => x.split(" in ")[0] == "partial redistribution"))
+    .concat(differencesGroupedFindings.filter(x => x.includes("complete redistribution")))
+
+
+  var variantsReverse = differencesGroupedFindings.filter(x => ["sev", "mod", "mil"].includes(x.slice(0, 3)));
+  var polyReverse = variantsReverse.filter(x => x.includes("and")).length > 0;
+  var differencesGroupedReverseFindings = formatStringArray(variantsReverse, txtSplit = ";", txtJucntion = (polyReverse ? ", and" : "and")).replace(" ,", ",");
+  if (differencesGroupedReverseFindings.length > 0) {
+    differencesGroupedFindingsNew.push(differencesGroupedReverseFindings);
+  }
+  
+  var textDifferencesGroupedFindings = differencesGroupedFindingsNew.join("; ");
+
+  // return impression
+
+  var impressionLAD =
+    textDifferencesLAD == "" ? "" :
+      textDifferencesLAD.includes("progression") ? textDifferencesLAD.split(" of ")[1].replace("decreased perfusion", "mixed viable and non-viable myocardial tissues") :
+        textDifferencesLAD.includes("complete") ? textDifferencesLAD.replace("complete redistribution", dicFindingsSeverity[severityOverallLADString].replace(" decreased perfusion", "") + " myocardial ischemia").replace("region", "(" + (areaOverallLAD < 2.5 ? "small" : areaOverallLAD < 4.5 ? "medium" : "large") + ") region") :
+          textDifferencesLAD.includes("partial") ? textDifferencesLAD.replace("partial redistribution", dicFindingsSeverity[severityOverallLADString].replace(" decreased perfusion", "") + " mixed viable and non-viable myocardial tissues").replace("region", "(" + (areaOverallLAD < 2.5 ? "small" : areaOverallLAD < 4.5 ? "medium" : "large") + ") region") :
+            textDifferencesLAD.includes("no ") ? textDifferencesLAD.replace("no redistribution", dicFindingsSeverity[severityOverallLADString].replace(" decreased perfusion", "") + " non-viable myocardial tissues").replace("region", "(" + (areaOverallLAD < 2.5 ? "small" : areaOverallLAD < 4.5 ? "medium" : "large") + ") region") :
+              textDifferencesLAD.replace("decreased perfusion", "reverse redistribution");
+
+  var impressionRCA =
+    textDifferencesRCA == "" ? "" :
+      textDifferencesRCA.includes("progression") ? textDifferencesRCA.split(" of ")[1].replace("decreased perfusion", "mixed viable and non-viable myocardial tissues") :
+        textDifferencesRCA.includes("complete") ? textDifferencesRCA.replace("complete redistribution", dicFindingsSeverity[severityOverallRCAString].replace(" decreased perfusion", "") + " myocardial ischemia").replace("region", "(" + (areaOverallRCA < 2.5 ? "small" : areaOverallRCA < 4.5 ? "medium" : "large") + ") region") :
+          textDifferencesRCA.includes("partial") ? textDifferencesRCA.replace("partial redistribution", dicFindingsSeverity[severityOverallRCAString].replace(" decreased perfusion", "") + " mixed viable and non-viable myocardial tissues").replace("region", "(" + (areaOverallRCA < 2.5 ? "small" : areaOverallRCA < 4.5 ? "medium" : "large") + ") region") :
+            textDifferencesRCA.includes("no ") ? textDifferencesRCA.replace("no redistribution", dicFindingsSeverity[severityOverallRCAString].replace(" decreased perfusion", "") + " non-viable myocardial tissues").replace("region", "(" + (areaOverallRCA < 2.5 ? "small" : areaOverallRCA < 4.5 ? "medium" : "large") + ") region") :
+              textDifferencesRCA.replace("decreased perfusion", "reverse redistribution");
+
+  var impressionLCX =
+    textDifferencesLCX == "" ? "" :
+      textDifferencesLCX.includes("progression") ? textDifferencesLCX.split(" of ")[1].replace("decreased perfusion", "mixed viable and non-viable myocardial tissues") :
+        textDifferencesLCX.includes("complete") ? textDifferencesLCX.replace("complete redistribution", dicFindingsSeverity[severityOverallLCXString].replace(" decreased perfusion", "") + " myocardial ischemia").replace("region", "(" + (areaOverallLCX < 2.5 ? "small" : areaOverallLCX < 4.5 ? "medium" : "large") + ") region") :
+          textDifferencesLCX.includes("partial") ? textDifferencesLCX.replace("partial redistribution", dicFindingsSeverity[severityOverallLCXString].replace(" decreased perfusion", "") + " mixed viable and non-viable myocardial tissues").replace("region", "(" + (areaOverallLCX < 2.5 ? "small" : areaOverallLCX < 4.5 ? "medium" : "large") + ") region") :
+            textDifferencesLCX.includes("no ") ? textDifferencesLCX.replace("no redistribution", dicFindingsSeverity[severityOverallLCXString].replace(" decreased perfusion", "") + " non-viable myocardial tissues").replace("region", "(" + (areaOverallLCX < 2.5 ? "small" : areaOverallLCX < 4.5 ? "medium" : "large") + ") region") :
+              textDifferencesLCX.replace("decreased perfusion", "reverse redistribution");
+
+  // var outputFindings = [findingStressLAD, findingStressRCA, findingStressLCX].filter(x => x != "").join("; ");
+
+  var outputFindings = textSeverityGroupedFindings;
+  outputFindings = outputFindings == "" ? "no perfusion defect" : outputFindings;
+  
+  // 檢查藥物選擇，如果不是 Persantin 則使用 "initial images" 代替 "stress images"
+  var medicationValue = document.getElementById('medicationSelect').value;
+  if (medicationValue !== "Persantin") {
+    outputFindings = "The initial images disclosed " + outputFindings + ".\n";
+  } else {
+    outputFindings = "The stress images disclosed " + outputFindings + ".\n";
+  }
+
+  outputFindings = outputFindings
+    + "The delayed images disclosed "
+    + textDifferencesGroupedFindings + ".";
+  // + [textDifferencesLAD, textDifferencesRCA, textDifferencesLCX].filter(x => x != "").join("; ") + ".";
+
+  outputFindings = outputFindings.includes("The delayed images disclosed .") ? "The stress and delayed images disclosed no perfusion defect." : outputFindings;
+
+  var scoreLAD = sumArray(valuesStressApex.concat(valuesStressAnterior).concat(valuesStressAnteroseptal)) * 4 + sumArray(valuesRestApex.concat(valuesRestAnterior).concat(valuesRestAnteroseptal));
+  var scoreRCA = sumArray(valuesStressInferoseptal.concat(valuesStressInferior)) * 4 + sumArray(valuesRestInferoseptal.concat(valuesRestInferior));
+  var scoreLCX = sumArray(valuesStressInferolateral.concat(valuesStressAnterolateral)) * 4 + sumArray(valuesRestInferolateral.concat(valuesRestAnterolateral));
+
+  let impressions = [impressionLAD, impressionRCA, impressionLCX];
+  let scores = [scoreLAD, scoreRCA, scoreLCX];
+
+  // Combine the arrays into an array of objects
+  let combined = impressions.map((impression, index) => {
+    return { impression: impression, score: scores[index] };
+  });
+
+  // Sort the combined array based on the scores
+  combined.sort((a, b) => b.score - a.score);
+
+  // Extract the sorted impressions
+  let sortedImpressions = combined.map(item => item.impression);
+
+  var dictionaryImpressions = {};
+
+  for (let i of sortedImpressions) {
+    let currentSeverity = i.split(" in ")[0];
+    let currentRegion = i.split(" in ")[1];
+
+    if (Object.keys(dictionaryImpressions).includes(currentSeverity)) {
+      dictionaryImpressions[currentSeverity].push(currentRegion);
+    } else {
+      dictionaryImpressions[currentSeverity] = [currentRegion];
+    }
+  }
+
+  var finalImpressions = [];
+  for (let i of Object.keys(dictionaryImpressions)) {
+    if (i.length > 0) {
+      finalImpressions.push(i + " in " + formatStringArray(dictionaryImpressions[i], txtSplit = ",", txtJucntion = "and"));
+    }
+  }
+
+  var outputImpression = prefixArrayElementsWithIndex(finalImpressions.filter(x => x != "").map(x => capitalizeFirstCharacter(x.replace("mildly", "mild").replace("moderately", "moderate").replace("severely", "severe")) + ".")).join("\n");
+
+  outputImpression = outputImpression == "" ? "Normal myocardial perfusion study." : outputImpression.includes("2. ") ? outputImpression : outputImpression.replace("1. ", "");
+
+  return {
+    'outputFindings': outputFindings,
+    'outputImpression': outputImpression
+  }
+}
+
+function sumArray(arr) {
+  return arr.reduce(function (accumulator, currentValue) {
+    return accumulator + currentValue;
+  }, 0);
+}
+
+function findMinimum(arr) {
+  return arr.reduce(function (min, currentValue) {
+    return (currentValue < min) ? currentValue : min;
+  });
+}
+
+function findMaximum(arr) {
+  return arr.reduce(function (max, currentValue) {
+    return (currentValue > max) ? currentValue : max;
+  });
+}
+
+function formatStringArray(arr, txtSplit = ";", txtJucntion = "and") {
+  let length = arr.length;
+
+  if (length === 0) {
+    return "";
+  } else if (length === 1) {
+    return arr[0];
+  } else if (length === 2) {
+    return arr[0] + " " + txtJucntion + " " + arr[1];
+  } else {
+    return arr.slice(0, -1).join(txtSplit + " ") + txtSplit + " " + txtJucntion + " " + arr[length - 1];
+  }
+}
+
+function isAnyElementGreaterThanZero(arr) {
+  return arr.some(function (element) {
+    return element > 0;
+  });
+}
+
+function isAnyElementLessThanZero(arr) {
+  return arr.some(function (element) {
+    return element < 0;
+  });
+}
+
+function mergeAndRemoveDuplicates(arr1, arr2) {
+  return Array.from(new Set(arr1.concat(arr2)));
+}
+
+function compareArraysAndReturnLargerElements(arr1, arr2) {
+  return arr1.map((element, index) => Math.max(element, arr2[index]));
+}
+
+function capitalizeFirstCharacter(sentence) {
+  if (sentence && typeof sentence === 'string') {
+    return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+  } else {
+    return '';
+  }
+}
+
+function prefixArrayElementsWithIndex(arr) {
+  return arr.map((element, index) => `${index + 1}. ${element}`);
+}
