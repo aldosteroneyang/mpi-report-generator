@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>雙組19區塊圖形</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: row; /* 改為水平佈局 */
+      justify-content: flex-start;
+      gap: 20px;
+      padding: 20px;
+      position: relative;
+      font-family: Arial, sans-serif;
+    }
+    
+    /* 左側區域 - 圖表 */
+    .charts-container {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+      width: 45%;
+      max-width: 500px;
+    }
+    
+    /* 右側區域 - 操作和報告 */
+    .right-container {
+      display: flex;
+      flex-direction: column;
+      width: 55%;
+      max-width: 600px;
+      position: relative;
+    }
+    
+    /* 下拉選單樣式 */
+    .dropdown-container {
+      position: relative; /* 改為相對定位 */
+      top: 0;
+      left: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    #medicationSelect, #aminophyllineSelect {
+      padding: 8px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      background-color: white;
+      min-width: 180px;
+      cursor: pointer;
+      appearance: auto; /* 使用瀏覽器原生下拉選單，提高反應速度 */
+    }
+    
+    #medicationSelect:focus, #aminophyllineSelect:focus {
+      outline: 2px solid #007bff;
+    }
+    
+    /* 報告生成控制區域 */
+    .report-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    
+    .report-btn {
+      font-size: 14px;
+      padding: 8px 15px;
+      width: 180px;
+      text-align: left;
+      background-color: #f8f9fa;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .report-btn:hover {
+      background-color: #e9ecef;
+    }
+    
+    .report-btn:active {
+      background-color: #dee2e6;
+    }
+    
+    /* 通知區域 */
+    .notification {
+      visibility: hidden;
+      position: fixed;
+      bottom: 5px;
+      left: 5px;
+      color: black;
+      text-align: left;
+      font-size: 14px;
+      padding: 15px;
+      background-color: rgba(255, 255, 255, 0.9);
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+    }
+    
+    /* 結果區域樣式 */
+    .result-container {
+      width: 100%;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      overflow: hidden;
+      background-color: white;
+    }
+    
+    .result-header {
+      background-color: #f8f9fa;
+      border-bottom: 1px solid #dee2e6;
+      padding: 10px 15px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .result-header button {
+      background: none;
+      border: none;
+      color: #6c757d;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 5px;
+    }
+    
+    .result-header button:hover {
+      color: #495057;
+    }
+    
+    .result-box {
+      border-bottom: 1px solid #dee2e6;
+      padding: 15px;
+      margin-bottom: 0;
+      background-color: #fff;
+      font-family: 'Calibri', sans-serif;
+      font-size: 14px;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+    }
+    
+    .result-box:last-child {
+      border-bottom: none;
+    }
+    
+    /* 讓 SVG 有個固定大小（可改成 width: 100% 做響應式） */
+    svg {
+      width: 100%;
+      height: auto;
+      border: none; /* 移除邊框 */
+      margin: 0 auto;
+      background-color: white;
+    }
+    
+    /* 統一設定扇形/圓的外觀與互動效果 */
+    path, circle {
+      fill: white;           /* 預設底色為白色 */
+      stroke: #333;          /* 外框線 */
+      stroke-width: 1;
+      cursor: pointer;
+      transition: fill 0.15s; /* 更快的過渡時間 */
+    }
+    path:hover, circle:hover {
+      opacity: 0.9;  /* 滑鼠滑過的顯示效果 */
+    }
+    
+    /* 不同數字狀態的底色 - 數字越低透明度越高 */
+    .state-0 { 
+      fill: rgb(255, 255, 255);
+    }
+    .state-1 { 
+      fill: rgb(0, 0, 0, 0.1);
+    }
+    .state-2 { 
+      fill: rgba(0, 0, 0, 0.3);
+    }
+    .state-3 { 
+      fill: rgba(0, 0, 0, 0.5);
+    }
+    
+    /* 數字樣式 */
+    text {
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      font-weight: bold;
+      fill: #333;            /* 固定數字為黑色 */
+      text-anchor: middle;   /* 文字水平居中 */
+      dominant-baseline: middle; /* 文字垂直居中 */
+      pointer-events: none;  /* 使文字不阻擋點擊事件 */
+      user-select: none;     /* 防止文字被選中 */
+    }
+    
+    /* 發送數據按鈕樣式 */
+    .send-data-btn {
+      margin-top: 15px;
+      padding: 10px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: background-color 0.3s;
+    }
+    
+    .send-data-btn:hover {
+      background-color: #45a049;
+    }
+    
+    /* 響應式調整 */
+    @media (max-width: 1200px) {
+      body {
+        flex-direction: column;
+      }
+      
+      .charts-container, .right-container {
+        width: 100%;
+        max-width: 800px;
+      }
+      
+      svg {
+        width: 400px;
+        height: 400px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 左側：圖表區域 -->
+<div class="charts-container">
+  <svg id="topChart" viewBox="0 0 400 400">
+    <!-- 透過 JS 動態生成四圈區塊 - 上方圖形 -->
+  </svg>
+  
+  <svg id="bottomChart" viewBox="0 0 400 400">
+    <!-- 透過 JS 動態生成四圈區塊 - 下方圖形 -->
+  </svg>
+</div>
+
+<!-- 右側：操作和報告區域 -->
+<div class="right-container">
+  <!-- 下拉選單 -->
+  <div class="dropdown-container">
+    <select id="medicationSelect">
+      <option value="Persantin" selected>Persantin</option>
+      <option value="Hold (Asthma)">Hold (Asthma)</option>
+      <option value="Hold (COPD)">Hold (COPD)</option>
+      <option value="Hold (RAD)">Hold (RAD)</option>
+      <option value="Hold (Hypotension)">Hold (Hypotension)</option>
+      <option value="Hold (Bradycardia)">Hold (Bradycardia)</option>
+      <option value="Hold (Aortic stenosis)">Hold (Aortic stenosis)</option>
+      <option value="Hold (High grade AVB)">Hold (High grade AVB)</option>
+    </select>
+    <select id="aminophyllineSelect">
+      <option value="No aminophylline" selected>No aminophylline</option>
+      <option value="One time">One time</option>
+      <option value="Two times">Two times</option>
+      <option value="Three times">Three times</option>
+    </select>
+  </div>
+
+  <!-- 報告結果顯示區域 -->
+  <div id="resultContainer" class="result-container">
+    <div class="result-header">
+      Procedure
+      <button id="clearValues">Reset</button>
+    </div>
+    <div class="result-box" id="procedureBox"></div>
+    
+    <div class="result-header">Findings</div>
+    <div class="result-box" id="findingsBox"></div>
+    
+    <div class="result-header">Impression</div>
+    <div class="result-box" id="impressionBox"></div>
+    
+    <div class="result-header">Addendum</div>
+    <div class="result-box" id="addendumBox"></div>
+  </div>
+  
+  <!-- 添加發送數據按鈕 -->
+  <button id="sendDataBtn" class="send-data-btn">Send report data</button>
+</div>
+
+<!-- 通知元素 -->
+<div id="notification" class="notification"></div>
+
+<script>
+// 創建一個圖表生成函數，可以重複使用
+function createCircleChart(svgId) {
+  const svg = document.getElementById(svgId);
+  
+  // 先定義視窗大小 & 圓心
+  const centerX = 200;
+  const centerY = 200;
+  
+  // 定義比例為 1:2:3:4
+  const maxRadius = 200;
+  
+  // 定義每一圈的內半徑 (innerR) 與外半徑 (outerR)，以及該圈要分割成幾塊
+  // 基於 1:2:3:4 的比例重新定義半徑
+  // 第 1 圈 (最外圈)：半徑 150~200 (4 單位)，切 6 等分
+  // 第 2 圈 (中層)：半徑 100~150 (3 單位)，切 6 等分
+  // 第 3 圈 (次內層)：半徑 50~100 (2 單位)，左右兩分再細分
+  // 最內圈 (中心)：半徑 0~50 (1 單位)，只是一塊圓
+  const rings = [
+    { innerR: 150, outerR: 200, segments: 6, startAngle: 0 },
+    { innerR: 100, outerR: 150, segments: 6, startAngle: 0 },
+    // 將第三圈改為使用自定義角度處理
+    { innerR:  50, outerR: 100, customSegments: true },
+  ];
+  
+  // 用來給每個區塊編號，從 1 數到 19
+  let segmentIndex = 1;
+  
+  // 存儲每個區塊的計數值 (0-3)
+  const segmentCounts = {};
+  
+  // 將segmentCounts保存到全局變數，使其可在重置時被訪問
+  window[`${svgId}Counts`] = segmentCounts;
+  
+  // 存儲已經觸發過的區塊ID，防止在拖曳過程中重複觸發
+  const activatedSegments = new Set();
+  
+  // 拖曳模式標誌
+  let isDragging = false;
+  
+  // 防止快速連續點擊的鎖定標誌（時間戳記錄）
+  let lastClickTime = 0;
+  const debounceTime = 80; // 降低為80毫秒，讓反應更快
+  
+  // 根據數字設置區塊的底色
+  function updateSegmentColor(element, number) {
+    // 移除所有狀態類別
+    element.classList.remove('state-0', 'state-1', 'state-2', 'state-3');
+    // 添加對應數字的狀態類別
+    element.classList.add(`state-${number}`);
+  }
+  
+  // 處理區塊激活
+  function activateSegment(element, index, textElement) {
+    // 如果這個區塊已經在當前拖曳中被激活過，則跳過
+    if (activatedSegments.has(index)) return;
+    
+    // 將區塊標記為已激活
+    activatedSegments.add(index);
+    
+    console.log(`激活了 ${svgId} 的區塊 #${index}`);
+    
+    // 使用全局變數的segmentCounts
+    const globalCounts = window[`${svgId}Counts`] || segmentCounts;
+    
+    // 確保 segmentCounts[index] 已初始化
+    if (globalCounts[index] === undefined) {
+      globalCounts[index] = 0;
+    }
+    
+    // 進行單次增加
+    globalCounts[index] = (globalCounts[index] + 1) % 4; // 0, 1, 2, 3, 0, ...
+    
+    // 直接更新顯示的數字和底色
+    textElement.textContent = globalCounts[index];
+    updateSegmentColor(element, globalCounts[index]);
+    
+    // 確保本地和全局變數同步
+    segmentCounts[index] = globalCounts[index];
+  }
+  
+  // 添加全局的mouseup事件監聽
+  document.addEventListener('mouseup', function() {
+    // 當滑鼠釋放時，結束拖曳模式並清空已激活區塊記錄
+    isDragging = false;
+    activatedSegments.clear();
+  });
+  
+  /**
+   * 創建單個扇形區塊
+   * @param {number} innerR       - 內半徑
+   * @param {number} outerR       - 外半徑
+   * @param {number} startAngle   - 起始角度
+   * @param {number} endAngle     - 結束角度
+   */
+  function createSingleSegment(innerR, outerR, startAngle, endAngle) {
+    // 外弧的起始與結束點
+    const xOuterStart = centerX + outerR * Math.cos(startAngle);
+    const yOuterStart = centerY + outerR * Math.sin(startAngle);
+    const xOuterEnd   = centerX + outerR * Math.cos(endAngle);
+    const yOuterEnd   = centerY + outerR * Math.sin(endAngle);
+
+    // 內弧的起始與結束點
+    const xInnerEnd   = centerX + innerR * Math.cos(startAngle);
+    const yInnerEnd   = centerY + innerR * Math.sin(startAngle);
+    const xInnerStart = centerX + innerR * Math.cos(endAngle);
+    const yInnerStart = centerY + innerR * Math.sin(endAngle);
+
+    // 判斷是否超過 180 度，用來設定 largeArcFlag
+    const largeArcFlag = (endAngle - startAngle) > Math.PI ? 1 : 0;
+    
+    const d = [
+      `M ${xOuterStart} ${yOuterStart}`,
+      `A ${outerR} ${outerR} 0 ${largeArcFlag} 1 ${xOuterEnd} ${yOuterEnd}`,
+      `L ${xInnerStart} ${yInnerStart}`,
+      `A ${innerR} ${innerR} 0 ${largeArcFlag} 0 ${xInnerEnd} ${yInnerEnd}`,
+      'Z'
+    ].join(' ');
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    path.setAttribute("id", `${svgId}-segment-${segmentIndex}`);
+    path.classList.add('state-0');
+    
+    // 計算區塊的中心點位置 (用於放置數字)
+    const segmentMiddleAngle = (startAngle + endAngle) / 2;
+    const segmentMiddleRadius = (innerR + outerR) / 2;
+    const textX = centerX + segmentMiddleRadius * Math.cos(segmentMiddleAngle);
+    const textY = centerY + segmentMiddleRadius * Math.sin(segmentMiddleAngle);
+    
+    // 創建文字元素顯示計數
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", textX);
+    text.setAttribute("y", textY);
+    text.setAttribute("id", `${svgId}-text-${segmentIndex}`);
+    text.textContent = "0"; // 初始值為 0
+    
+    // 初始化計數值
+    segmentCounts[segmentIndex] = 0;
+    
+    // 使用立即函數創建封閉作用域來保存當前索引
+    (function(currentIndex) {
+      // 滑鼠按下事件
+      path.addEventListener("mousedown", function(event) {
+        event.stopPropagation();
+        
+        // 開始拖曳模式
+        isDragging = true;
+        
+        // 清空已激活區塊記錄
+        activatedSegments.clear();
+        
+        // 當滑鼠按下時立即激活當前區塊
+        activateSegment(this, currentIndex, text);
+      });
+      
+      // 滑鼠移動經過事件
+      path.addEventListener("mouseover", function(event) {
+        // 如果不在拖曳模式中，則不做處理
+        if (!isDragging) return;
+        
+        // 在拖曳模式中經過區塊時激活它
+        activateSegment(this, currentIndex, text);
+      });
+    })(segmentIndex);
+    
+    svg.appendChild(path);
+    svg.appendChild(text);
+    
+    segmentIndex++;
+    
+    return path;
+  }
+  
+  /**
+   * 建立一個「同心環」的各扇形區塊
+   * @param {number} innerR      - 該環的內半徑
+   * @param {number} outerR      - 該環的外半徑
+   * @param {number} segments    - 要切成幾個扇形
+   * @param {number} startAngle  - 起始角度偏移
+   */
+  function createRingSegments(innerR, outerR, segments, startAngle = 0) {
+    const angleStep = (2 * Math.PI) / segments;
+    
+    for (let i = 0; i < segments; i++) {
+      const segmentStartAngle = startAngle + angleStep * i;
+      const segmentEndAngle   = startAngle + angleStep * (i + 1);
+      createSingleSegment(innerR, outerR, segmentStartAngle, segmentEndAngle);
+    }
+  }
+  
+  /**
+   * 為第三圈創建特殊的6等分（上下區域保持不變，左右各分成2份）
+   * @param {number} innerR      - 該環的內半徑
+   * @param {number} outerR      - 該環的外半徑
+   */
+  function createCustomThirdRing(innerR, outerR) {
+    // 上區塊 (保持不變，45度 ~ 135度)
+    createSingleSegment(innerR, outerR, Math.PI/4, 3*Math.PI/4);
+    
+    // 左區塊分為左上和左下
+    // 左上 (135度 ~ 180度)
+    createSingleSegment(innerR, outerR, 3*Math.PI/4, Math.PI);
+    // 左下 (180度 ~ 225度)
+    createSingleSegment(innerR, outerR, Math.PI, 5*Math.PI/4);
+    
+    // 下區塊 (保持不變，225度 ~ 315度)
+    createSingleSegment(innerR, outerR, 5*Math.PI/4, 7*Math.PI/4);
+    
+    // 右區塊分為右下和右上
+    // 右下 (315度 ~ 360度)
+    createSingleSegment(innerR, outerR, 7*Math.PI/4, 2*Math.PI);
+    // 右上 (0度 ~ 45度)
+    createSingleSegment(innerR, outerR, 0, Math.PI/4);
+  }
+  
+  // 依序建立外圈→中圈→次內圈
+  rings.forEach(ring => {
+    if (ring.customSegments) {
+      // 第三圈使用自定義角度處理
+      createCustomThirdRing(ring.innerR, ring.outerR);
+    } else {
+      // 其他圈使用標準均勻分割
+      createRingSegments(ring.innerR, ring.outerR, ring.segments, ring.startAngle || 0);
+    }
+  });
+  
+  // 最後建立「最內圈」：用 <circle> 直接當作一塊
+  const centerRadius = 50; // 根據 1:2:3:4 比例，內圈半徑為 50
+  const centerCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  centerCircle.setAttribute("cx", centerX);
+  centerCircle.setAttribute("cy", centerY);
+  centerCircle.setAttribute("r", centerRadius);
+  centerCircle.setAttribute("id", `${svgId}-segment-${segmentIndex}`);
+  centerCircle.classList.add('state-0'); // 設置初始狀態
+  
+  // 創建中心圓的文字元素
+  const centerText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  centerText.setAttribute("x", centerX);
+  centerText.setAttribute("y", centerY);
+  centerText.setAttribute("id", `${svgId}-text-${segmentIndex}`);
+  centerText.textContent = "0"; // 初始值為 0
+  
+  // 初始化中心圓的計數值
+  segmentCounts[segmentIndex] = 0;
+  
+  // 更新中心圓的事件處理
+  (function(currentIndex) {
+    // 滑鼠按下事件
+    centerCircle.addEventListener("mousedown", function(event) {
+      event.stopPropagation();
+      isDragging = true;
+      activatedSegments.clear();
+      activateSegment(this, currentIndex, centerText);
+    });
+    
+    // 滑鼠移動經過事件
+    centerCircle.addEventListener("mouseover", function(event) {
+      if (!isDragging) return;
+      activateSegment(this, currentIndex, centerText);
+    });
+  })(segmentIndex);
+  
+  svg.appendChild(centerCircle);
+  svg.appendChild(centerText);
+}
+
+// 創建兩組圖表
+createCircleChart('topChart');
+createCircleChart('bottomChart');
+
+// 下拉選單事件處理
+document.getElementById('medicationSelect').addEventListener('change', function(e) {
+  console.log('Selected medication: ' + this.value);
+  // 這裡可以添加根據選擇值進行的其他操作
+});
+
+document.getElementById('aminophyllineSelect').addEventListener('change', function(e) {
+  console.log('Selected aminophylline frequency: ' + this.value);
+  // 這裡可以添加根據選擇值進行的其他操作
+});
+
+// 收集報告數據並發送給開啟窗口的函數
+function sendReportData() {
+  // 收集報告數據
+  const reportData = {
+    Procedure: document.getElementById('procedureBox').textContent,
+    Findings: document.getElementById('findingsBox').textContent,
+    Impression: document.getElementById('impressionBox').textContent,
+    Addendum: document.getElementById('addendumBox').textContent
+  };
+
+  // 檢查是否有 window.opener
+  if (window.opener) {
+    // 發送數據給開啟窗口
+    window.opener.postMessage(reportData, '*');
+    
+    // 顯示通知
+    const notification = document.getElementById('notification');
+    notification.textContent = 'Report data sent!';
+    notification.style.visibility = 'visible';
+    
+    // 3秒後隱藏通知
+    setTimeout(() => {
+      notification.style.visibility = 'hidden';
+    }, 3000);
+    
+    console.log('Report data sent:', reportData);
+  } else {
+    console.error('No opener found, unable to send data');
+    
+    // 顯示錯誤通知
+    const notification = document.getElementById('notification');
+    notification.textContent = 'No opener found, unable to send data';
+    notification.style.visibility = 'visible';
+    
+    // 3秒後隱藏通知
+    setTimeout(() => {
+      notification.style.visibility = 'hidden';
+    }, 3000);
+  }
+}
+
+// 添加發送數據按鈕的事件監聽器
+document.getElementById('sendDataBtn').addEventListener('click', sendReportData);
+</script>
+
+<!-- 引入報告生成相關的 JavaScript -->
+<script src="mpi-report.js"></script>
+
+</body>
+</html>

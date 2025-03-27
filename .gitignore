@@ -1,0 +1,3 @@
+@MPI sample.txt
+*.log
+.DS_Store
