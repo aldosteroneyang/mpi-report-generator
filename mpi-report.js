@@ -6,70 +6,30 @@
 // 等待 DOM 完全加載後初始化
 document.addEventListener('DOMContentLoaded', initReportGenerator);
 
-// 添加窗口消息監聽器，用於接收數據
-window.addEventListener('message', receiveMessage);
-
-/**
- * 接收從其他窗口傳來的報告數據和患者數據
- * @param {MessageEvent} event - 消息事件對象
- */
-function receiveMessage(event) {
-  // 安全檢查，確保數據來源可信
-  console.log('收到訊息，來源為:', event.origin);
+// 同時在頁面加載時檢查URL參數中的患者數據
+document.addEventListener('DOMContentLoaded', function() {
+  // 檢查URL參數
+  const urlParams = new URLSearchParams(window.location.search);
+  const encodedData = urlParams.get('data');
   
-  // 檢查數據是否存在且為對象類型
-  if (!event.data || typeof event.data !== 'object') {
-    console.error('接收到無效數據格式');
-    return;
+  if (encodedData) {
+    try {
+      // 解碼 Base64 資料
+      const jsonString = atob(encodedData);
+      const data = JSON.parse(jsonString);
+      
+      console.log('從URL參數接收到患者數據:', data);
+      
+      // 處理數據
+      handlePatientData(data);
+    } catch (e) {
+      console.error('解析URL資料時出錯:', e);
+      showNotification('解析URL資料時發生錯誤');
+    }
+  } else {
+    console.log('URL參數中沒有找到患者數據');
   }
-  
-  // 處理報告數據
-  if (event.data.Procedure || event.data.Findings || event.data.Impression || event.data.Addendum) {
-    console.log('接收到報告數據:', event.data);
-    receiveReportData(event);
-  }
-  
-  // 處理患者資料 (根據 GUI_EXTENSION_DATA 類型識別)
-  if (event.data.type === 'GUI_EXTENSION_DATA') {
-    console.log('接收到患者數據:', event.data);
-    handlePatientData(event.data);
-  }
-  
-  // 如果收到請求重發數據的訊息
-  if (event.data.type === 'REQUEST_DATA' && event.source) {
-    console.log('收到數據重發請求');
-    // 此處如果需要實現數據重發功能，可添加相關邏輯
-  }
-}
-
-/**
- * 處理接收到的報告數據
- * @param {MessageEvent} event - 消息事件對象
- */
-function receiveReportData(event) {
-  // 處理接收到的數據
-  const reportData = event.data;
-  
-  // 如果界面上有對應的元素，則更新內容
-  if (reportData.Procedure && document.getElementById('procedureBox')) {
-    document.getElementById('procedureBox').textContent = reportData.Procedure;
-  }
-  
-  if (reportData.Findings && document.getElementById('findingsBox')) {
-    document.getElementById('findingsBox').textContent = reportData.Findings;
-  }
-  
-  if (reportData.Impression && document.getElementById('impressionBox')) {
-    document.getElementById('impressionBox').textContent = reportData.Impression;
-  }
-  
-  if (reportData.Addendum && document.getElementById('addendumBox')) {
-    document.getElementById('addendumBox').textContent = reportData.Addendum;
-  }
-  
-  // 顯示接收成功通知
-  showNotification('報告數據已接收並更新!');
-}
+});
 
 /**
  * 處理患者資料
