@@ -14,6 +14,35 @@
       font-family: Arial, sans-serif;
     }
     
+    /* 患者資料顯示區域 */
+    #patientInfoBlock {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      border: 1px solid #ccc; 
+      padding: 10px; 
+      margin: 10px 0; 
+      background-color: #f9f9f9; 
+      border-radius: 5px;
+      font-size: 14px;
+      z-index: 200;
+    }
+    
+    #patientInfoBlock h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+    }
+    
+    #patientInfoBlock ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    #patientInfoBlock li {
+      margin-bottom: 5px;
+    }
+    
     /* 左側區域 - 圖表 */
     .charts-container {
       display: flex;
@@ -236,6 +265,18 @@
 </head>
 <body>
 
+<!-- 患者資料顯示區域 -->
+<div id="patientInfoBlock" style="display: none;">
+  <h3>患者資料</h3>
+  <ul>
+    <li id="gender">性別: </li>
+    <li id="age">年齡: </li>
+    <li id="referno">報告編號: </li>
+    <li id="patno">病患編號: </li>
+    <li id="mciid">MCIID: </li>
+  </ul>
+</div>
+
 <!-- 左側：圖表區域 -->
 <div class="charts-container">
   <svg id="topChart" viewBox="0 0 400 400">
@@ -249,18 +290,6 @@
 
 <!-- 右側：操作和報告區域 -->
 <div class="right-container">
-  <!-- 患者資料顯示區域 -->
-  <div id="patientInfoContainer" class="result-container" style="margin-bottom: 15px;">
-    <div class="result-header">Patient Information</div>
-    <div class="result-box" id="patientInfoBox">
-      <div><span style="font-weight: bold;">性別：</span><span id="gender">-</span></div>
-      <div><span style="font-weight: bold;">年齡：</span><span id="age">-</span></div>
-      <div><span style="font-weight: bold;">報告編號：</span><span id="referno">-</span></div>
-      <div><span style="font-weight: bold;">病患編號：</span><span id="patno">-</span></div>
-      <div><span style="font-weight: bold;">MCIID：</span><span id="mciid">-</span></div>
-    </div>
-  </div>
-  
   <!-- 下拉選單 -->
   <div class="dropdown-container">
     <select id="medicationSelect">
@@ -301,8 +330,6 @@
   
   <!-- 添加發送數據按鈕 -->
   <button id="sendDataBtn" class="send-data-btn">Send report data</button>
-  <!-- 添加導入資料按鈕 -->
-  <button id="importDataBtn" class="send-data-btn" style="background-color: #007bff; margin-top: 10px;">Import patient data</button>
 </div>
 
 <!-- 通知元素 -->

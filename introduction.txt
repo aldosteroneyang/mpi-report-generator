@@ -1,0 +1,260 @@
+# 患者信息接收指南 (postMessage方法)
+
+本文檔說明如何在報告生成器視窗中接收和顯示從原始頁面傳來的患者信息。
+
+## 工作原理
+
+1. 當使用者在原始頁面點擊按鈕時，擴充功能會打開一個新視窗 (window.open)。
+2. 原始頁面會使用 postMessage API 將患者資料傳送至新視窗。
+3. 報告生成器視窗需要設置一個監聽器來接收這些資料。
+
+## 接收資料的JavaScript代碼
+
+將以下代碼添加到報告生成器頁面的JavaScript中：
+
+```javascript
+// 當文檔完成載入時設置監聽器
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('報告生成器：頁面已載入，等待患者資料...');
+    
+    // 設置全局變數存儲患者資料
+    window.patientData = null;
+    
+    // 設置 postMessage 監聽器
+    window.addEventListener('message', function(event) {
+        // 檢查資料來源安全性 (可選，但建議使用)
+        // 如果您知道原始頁面的確切域名，可以取消註釋以下行並設置正確的域名
+        // if (event.origin !== 'http://your-original-domain.com') return;
+        
+        console.log('報告生成器：收到訊息', event.data);
+        
+        // 驗證資料
+        if (!event.data || typeof event.data !== 'object') {
+            console.error('報告生成器：收到無效資料格式');
+            return;
+        }
+        
+        // 處理資料
+        if (event.data.type === 'GUI_EXTENSION_DATA') {
+            console.log('報告生成器：收到GUI擴充功能資料');
+            
+            // 存儲完整資料
+            window.patientData = event.data;
+            
+            // 處理患者資訊
+            if (event.data.patientInfo) {
+                console.log('報告生成器：處理患者資訊', event.data.patientInfo);
+                handlePatientInfo(event.data.patientInfo);
+            }
+            
+            // 處理其他資料 (如文本值等)
+            if (event.data.textValues) {
+                console.log('報告生成器：處理文本值', event.data.textValues);
+                // 在這裡處理文本值
+                // handleTextValues(event.data.textValues);
+            }
+            
+            // 處理MCIID
+            if (event.data.mciid) {
+                console.log('報告生成器：處理MCIID', event.data.mciid);
+                // 在這裡處理MCIID
+                const mciidElement = document.getElementById('mciid');
+                if (mciidElement) {
+                    mciidElement.textContent = event.data.mciid;
+                }
+            }
+        }
+    });
+    
+    // 如果10秒後仍未收到資料，請求父窗口重新發送
+    setTimeout(function() {
+        if (!window.patientData && window.opener) {
+            console.log('報告生成器：未收到資料，請求資料重發');
+            try {
+                // 向父窗口發送請求
+                window.opener.postMessage({ type: 'REQUEST_DATA' }, '*');
+            } catch (e) {
+                console.error('報告生成器：請求資料失敗', e);
+            }
+        }
+    }, 10000);
+});
+
+// 處理患者資訊的函數
+function handlePatientInfo(patientInfo) {
+    if (!patientInfo) {
+        console.error('報告生成器：收到空的患者資訊');
+        return;
+    }
+    
+    try {
+        // 獲取性別資訊，並做標準化處理
+        let genderText = '';
+        if (patientInfo.gender) {
+            // 將數字或代碼轉換為文字
+            if (patientInfo.gender === 'M' || patientInfo.gender === '1' || 
+                patientInfo.gender.toLowerCase() === 'm' || patientInfo.gender.includes('男')) {
+                genderText = '男';
+            } else if (patientInfo.gender === 'F' || patientInfo.gender === '2' || 
+                patientInfo.gender.toLowerCase() === 'f' || patientInfo.gender.includes('女')) {
+                genderText = '女';
+            } else {
+                genderText = patientInfo.gender; // 使用原始值
+            }
+        }
+        
+        // 獲取其他患者資訊
+        const age = patientInfo.age || '';
+        const referno = patientInfo.referno || '';
+        const patno = patientInfo.patno || '';
+        
+        // 顯示在頁面上
+        displayPatientInfo(genderText, age, referno, patno);
+        
+    } catch (e) {
+        console.error('報告生成器：處理患者資訊時出錯:', e);
+    }
+}
+
+// 在頁面上顯示患者資訊
+function displayPatientInfo(gender, age, referno, patno) {
+    // 尋找頁面上的元素
+    updateElementContent('gender', gender);
+    updateElementContent('age', age);
+    updateElementContent('referno', referno);
+    updateElementContent('patno', patno);
+    
+    // 如果頁面上沒有相應元素，創建一個資訊區塊
+    if (!document.getElementById('gender') && !document.getElementById('age') && 
+        !document.getElementById('referno') && !document.getElementById('patno')) {
+        createPatientInfoBlock(gender, age, referno, patno);
+    }
+}
+
+// 更新元素內容的輔助函數
+function updateElementContent(id, value) {
+    // 嘗試多種選擇器
+    const selectors = [
+        `#${id}`, 
+        `[name="${id}"]`, 
+        `.${id}`, 
+        `input[name="${id}"]`, 
+        `span.${id}`,
+        `div.${id}`,
+        `[data-field="${id}"]`
+    ];
+    
+    // 嘗試每一個選擇器
+    for (const selector of selectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+            // 根據元素類型設置內容
+            if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+                element.value = value;
+            } else {
+                element.textContent = value;
+            }
+            console.log(`報告生成器：更新了 ${id} 元素，值為 ${value}`);
+            return true;
+        }
+    }
+    
+    console.log(`報告生成器：未找到 ${id} 元素`);
+    return false;
+}
+
+// 創建患者資訊區塊的函數
+function createPatientInfoBlock(gender, age, referno, patno) {
+    // 創建資訊區塊容器
+    const infoBlock = document.createElement('div');
+    infoBlock.id = 'patientInfoBlock';
+    infoBlock.style.cssText = 'border: 1px solid #ccc; padding: 10px; margin: 10px 0; background-color: #f9f9f9; border-radius: 5px;';
+    
+    // 設置標題
+    const title = document.createElement('h3');
+    title.textContent = '患者資訊';
+    title.style.margin = '0 0 10px 0';
+    infoBlock.appendChild(title);
+    
+    // 添加患者資訊
+    const infoList = document.createElement('ul');
+    infoList.style.listStyle = 'none';
+    infoList.style.padding = '0';
+    infoList.style.margin = '0';
+    
+    // 添加各項資訊
+    if (gender) {
+        const item = document.createElement('li');
+        item.id = 'gender';
+        item.textContent = `性別: ${gender}`;
+        item.style.marginBottom = '5px';
+        infoList.appendChild(item);
+    }
+    
+    if (age) {
+        const item = document.createElement('li');
+        item.id = 'age';
+        item.textContent = `年齡: ${age}`;
+        item.style.marginBottom = '5px';
+        infoList.appendChild(item);
+    }
+    
+    if (referno) {
+        const item = document.createElement('li');
+        item.id = 'referno';
+        item.textContent = `報告編號: ${referno}`;
+        item.style.marginBottom = '5px';
+        infoList.appendChild(item);
+    }
+    
+    if (patno) {
+        const item = document.createElement('li');
+        item.id = 'patno';
+        item.textContent = `病患編號: ${patno}`;
+        item.style.marginBottom = '5px';
+        infoList.appendChild(item);
+    }
+    
+    infoBlock.appendChild(infoList);
+    
+    // 插入到頁面頂部
+    document.body.insertBefore(infoBlock, document.body.firstChild);
+    console.log('報告生成器：已創建患者資訊區塊');
+}
+```
+
+## 測試方法
+
+在報告生成器的開發過程中，您可以使用以下代碼在瀏覽器控制台中模擬接收 postMessage 資料：
+
+```javascript
+// 模擬收到 postMessage 資料
+window.dispatchEvent(new MessageEvent('message', {
+    data: {
+        type: 'GUI_EXTENSION_DATA',
+        mciid: '9310308',
+        patientInfo: {
+            gender: 'M',
+            age: '87',
+            referno: '931025P01283',
+            patno: '02375862'
+        }
+    },
+    origin: window.location.origin // 模擬來自同源
+}));
+```
+
+## 常見問題解決
+
+1. **沒有收到資料**：
+   - 檢查控制台是否有錯誤訊息
+   - 確認報告生成器頁面已正確設置 postMessage 監聽器
+   - 網路或跨域問題可能阻止 postMessage 傳輸
+
+2. **資料顯示不正確**：
+   - 檢查 handlePatientInfo 函數中的邏輯
+   - 確認頁面中存在對應的元素或使用正確的選擇器
+
+3. **樣式問題**：
+   - 自定義 createPatientInfoBlock 函數中的樣式
+   - 確保樣式與報告生成器的整體設計協調
