@@ -198,9 +198,16 @@
       user-select: none;     /* 防止文字被選中 */
     }
     
+    /* 按鈕容器樣式 */
+    .buttons-container {
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
     /* 發送數據按鈕樣式 */
     .send-data-btn {
-      margin-top: 15px;
       padding: 10px 15px;
       background-color: #4CAF50;
       color: white;
@@ -210,10 +217,29 @@
       font-size: 14px;
       font-weight: bold;
       transition: background-color 0.3s;
+      flex: 1;
     }
     
     .send-data-btn:hover {
       background-color: #45a049;
+    }
+    
+    /* 載入病人資料按鈕樣式 */
+    .import-data-btn {
+      padding: 10px 15px;
+      background-color: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: background-color 0.3s;
+      flex: 1;
+    }
+    
+    .import-data-btn:hover {
+      background-color: #0b7dda;
     }
     
     /* 響應式調整 */
@@ -232,6 +258,15 @@
         height: 400px;
       }
     }
+    
+    /* 患者資訊容器樣式 */
+    .patient-info-container {
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      background-color: #f9f9f9;
+    }
   </style>
 </head>
 <body>
@@ -249,6 +284,13 @@
 
 <!-- 右側：操作和報告區域 -->
 <div class="right-container">
+  <!-- 病人資料顯示區塊 -->
+  <div id="patient-info" class="patient-info-container">
+    <!-- 患者資訊將被動態填入此處 -->
+    <div class="result-header">病人資料</div>
+    <div class="result-box" id="patient-info-content"></div>
+  </div>
+
   <!-- 下拉選單 -->
   <div class="dropdown-container">
     <select id="medicationSelect">
@@ -271,15 +313,6 @@
 
   <!-- 報告結果顯示區域 -->
   <div id="resultContainer" class="result-container">
-    <!-- 添加患者信息區域 -->
-    <div class="result-header">Patient Info</div>
-    <div class="result-box" id="patientInfoBox">
-      <div id="patientGender"></div>
-      <div id="patientAge"></div>
-      <div id="patientReferno"></div>
-      <div id="patientPatno"></div>
-    </div>
-    
     <div class="result-header">
       Procedure
       <button id="clearValues">Reset</button>
@@ -297,7 +330,10 @@
   </div>
   
   <!-- 添加發送數據按鈕 -->
-  <button id="sendDataBtn" class="send-data-btn">Send report data</button>
+  <div class="buttons-container">
+    <button id="sendDataBtn" class="send-data-btn">Send report data</button>
+    <button id="importDataBtn" class="import-data-btn">Import patient data</button>
+  </div>
 </div>
 
 <!-- 通知元素 -->
@@ -628,6 +664,36 @@ function sendReportData() {
 
 // 添加發送數據按鈕的事件監聽器
 document.getElementById('sendDataBtn').addEventListener('click', sendReportData);
+
+// 添加載入病人資料按鈕的事件監聽器
+document.getElementById('importDataBtn').addEventListener('click', importPatientData);
+
+// 手動載入病人資料的函數
+function importPatientData() {
+  // 創建一個示例數據對象以測試功能
+  const samplePatientData = {
+    type: 'GUI_EXTENSION_DATA',
+    patientInfo: {
+      gender: 'M',
+      age: '65',
+      referno: '931133P02950',
+      patno: '12345'
+    }
+  };
+  
+  // 調用處理函數，模擬接收到數據
+  handlePatientInfo(samplePatientData.patientInfo);
+  
+  // 顯示通知
+  const notification = document.getElementById('notification');
+  notification.textContent = '已載入病人資料';
+  notification.style.visibility = 'visible';
+  
+  // 3秒後隱藏通知
+  setTimeout(() => {
+    notification.style.visibility = 'hidden';
+  }, 3000);
+}
 </script>
 
 <!-- 引入報告生成相關的 JavaScript -->

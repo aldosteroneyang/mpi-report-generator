@@ -6,192 +6,124 @@
 // 等待 DOM 完全加載後初始化
 document.addEventListener('DOMContentLoaded', initReportGenerator);
 
-// 初始化數據接收模塊
-document.addEventListener('DOMContentLoaded', initDataReceiver);
+// 添加窗口消息監聽器，用於接收數據
+window.addEventListener('message', receiveReportData);
 
 /**
- * 初始化所有數據接收方法
+ * 接收從其他窗口傳來的報告數據
+ * @param {MessageEvent} event - 消息事件對象
  */
-function initDataReceiver() {
-  console.log('初始化數據接收模塊');
+function receiveReportData(event) {
+  // 安全檢查，確保數據來源可信
+  console.log('Received message from:', event.origin);
   
-  // 方法1: 檢查 window 對象
-  if (window.GUI_EXTENSION_DATA) {
-    console.log('從 window 對象獲取數據');
-    processReceivedData(window.GUI_EXTENSION_DATA);
+  // 檢查是否是擴充功能傳來的病人資料
+  if (event.data && event.data.type === 'GUI_EXTENSION_DATA') {
+    console.log('Received patient data via postMessage:', event.data);
+    
+    // 處理患者資訊
+    if (event.data.patientInfo) {
+      handlePatientInfo(event.data.patientInfo);
+    }
     return;
   }
   
-  // 方法2: 檢查 URL 參數
-  const urlParams = new URLSearchParams(window.location.search);
-  const encodedData = urlParams.get('data');
-  if (encodedData) {
-    try {
-      console.log('從 URL 參數獲取數據');
-      const decodedData = JSON.parse(atob(encodedData));
-      processReceivedData(decodedData);
-      return;
-    } catch (e) {
-      console.error('解析 URL 數據失敗:', e);
-    }
-  }
-  
-  // 方法3: 監聽自定義事件
-  window.addEventListener('GUI_DATA_RECEIVED', function(e) {
-    console.log('從自定義事件獲取數據');
-    processReceivedData(e.detail);
-  });
-  
-  // 方法4: 監聽 postMessage (已有，但更新為符合文檔格式)
-  window.addEventListener('message', function(event) {
-    console.log('收到 postMessage 消息:', event.origin, event.data);
+  // 檢查數據是否存在且為對象類型（報告數據）
+  if (event.data && typeof event.data === 'object') {
+    console.log('Received report data:', event.data);
     
-    // 處理一般的 postMessage 數據
-    if (event.data && typeof event.data === 'object') {
-      // 如果是擴展發送的特定格式數據
-      if (event.data.type === 'GUI_EXTENSION_DATA') {
-        console.log('從 postMessage 獲取擴展數據');
-        processReceivedData(event.data);
-      } 
-      // 處理原有的報告數據格式
-      else if (event.data.Procedure || event.data.Findings || event.data.Impression || event.data.Addendum) {
-        console.log('從 postMessage 獲取報告數據');
-        processReportData(event.data);
-      }
-    }
-  });
-  
-  // 方法5: 主動請求數據（可選）
-  if (window.opener) {
-    window.opener.postMessage({
-      type: 'GUI_REQUEST_DATA'
-    }, '*');
-  }
-}
-
-/**
- * 處理接收到的擴展數據
- * @param {Object} data - 擴展傳送的數據
- */
-function processReceivedData(data) {
-  console.log('處理接收到的擴展數據', data);
-  
-  // 發送確認回執
-  confirmDataReceived();
-  
-  // 處理擴展數據（如果有textValues）
-  if (data.textValues) {
-    if (data.textValues.Procedure && document.getElementById('procedureBox')) {
-      document.getElementById('procedureBox').textContent = data.textValues.Procedure;
+    // 處理接收到的數據
+    const reportData = event.data;
+    
+    // 如果界面上有對應的元素，則更新內容
+    if (reportData.Procedure && document.getElementById('procedureBox')) {
+      document.getElementById('procedureBox').textContent = reportData.Procedure;
     }
     
-    if (data.textValues.Findings && document.getElementById('findingsBox')) {
-      document.getElementById('findingsBox').textContent = data.textValues.Findings;
+    if (reportData.Findings && document.getElementById('findingsBox')) {
+      document.getElementById('findingsBox').textContent = reportData.Findings;
     }
     
-    if (data.textValues.Impression && document.getElementById('impressionBox')) {
-      document.getElementById('impressionBox').textContent = data.textValues.Impression;
+    if (reportData.Impression && document.getElementById('impressionBox')) {
+      document.getElementById('impressionBox').textContent = reportData.Impression;
     }
     
-    if (data.textValues.Addendum && document.getElementById('addendumBox')) {
-      document.getElementById('addendumBox').textContent = data.textValues.Addendum;
+    if (reportData.Addendum && document.getElementById('addendumBox')) {
+      document.getElementById('addendumBox').textContent = reportData.Addendum;
     }
     
     // 顯示接收成功通知
-    showNotification('擴展數據已接收並更新!');
-  }
-  
-  // 處理患者數據並顯示
-  if (data.patientData) {
-    console.log('患者信息:', data.patientData);
-    
-    // 格式化顯示性別 (1=男性, 2=女性, 其他值顯示原始值)
-    const gender = data.patientData.gender;
-    let genderText = gender;
-    if (gender === '1') {
-      genderText = '性別: 男性';
-    } else if (gender === '2') {
-      genderText = '性別: 女性';
-    } else {
-      genderText = '性別: ' + gender;
-    }
-    
-    // 顯示年齡
-    const ageText = data.patientData.age ? '年齡: ' + data.patientData.age : '';
-    
-    // 顯示病歷號
-    const refernoText = data.patientData.referno ? '病歷號: ' + data.patientData.referno : '';
-    
-    // 顯示病患號碼
-    const patnoText = data.patientData.patno ? '病患號碼: ' + data.patientData.patno : '';
-    
-    // 更新顯示到界面上
-    if (document.getElementById('patientGender')) {
-      document.getElementById('patientGender').textContent = genderText;
-    }
-    
-    if (document.getElementById('patientAge')) {
-      document.getElementById('patientAge').textContent = ageText;
-    }
-    
-    if (document.getElementById('patientReferno')) {
-      document.getElementById('patientReferno').textContent = refernoText;
-    }
-    
-    if (document.getElementById('patientPatno')) {
-      document.getElementById('patientPatno').textContent = patnoText;
-    }
-    
-    // 顯示接收到患者數據的通知
-    showNotification('患者數據已接收並顯示!');
-  }
-  
-  if (data.config) {
-    console.log('配置信息:', data.config);
+    showNotification('報告數據已接收並更新!');
   }
 }
 
 /**
- * 處理接收到的報告數據（原有格式）
- * @param {Object} reportData - 報告數據
+ * 從URL參數獲取病人資料
  */
-function processReportData(reportData) {
-  console.log('處理接收到的報告數據', reportData);
+function getPatientDataFromUrl() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const encodedData = urlParams.get('data');
   
-  // 如果界面上有對應的元素，則更新內容
-  if (reportData.Procedure && document.getElementById('procedureBox')) {
-    document.getElementById('procedureBox').textContent = reportData.Procedure;
+  if (encodedData) {
+    try {
+      // 解碼 Base64 資料
+      const jsonString = atob(encodedData);
+      const data = JSON.parse(jsonString);
+      
+      console.log('從 URL 參數接收到資料:', data);
+      
+      // 檢查是否包含患者資訊
+      if (data.patientInfo) {
+        handlePatientInfo(data.patientInfo);
+      }
+    } catch (e) {
+      console.error('解析 URL 資料時出錯:', e);
+    }
   }
-  
-  if (reportData.Findings && document.getElementById('findingsBox')) {
-    document.getElementById('findingsBox').textContent = reportData.Findings;
-  }
-  
-  if (reportData.Impression && document.getElementById('impressionBox')) {
-    document.getElementById('impressionBox').textContent = reportData.Impression;
-  }
-  
-  if (reportData.Addendum && document.getElementById('addendumBox')) {
-    document.getElementById('addendumBox').textContent = reportData.Addendum;
-  }
-  
-  // 顯示接收成功通知
-  showNotification('報告數據已接收並更新!');
 }
 
 /**
- * 發送確認回執
+ * 處理患者資訊的函數
+ * @param {Object} patientInfo - 患者資訊對象
  */
-function confirmDataReceived() {
-  if (window.opener) {
-    window.opener.postMessage({
-      type: 'GUI_DATA_RECEIVED_ACK'
-    }, '*');
-    console.log('已發送數據接收確認');
+function handlePatientInfo(patientInfo) {
+  if (!patientInfo) return;
+  
+  console.log('接收到患者資訊:', patientInfo);
+  
+  // 在特定區塊顯示患者資訊
+  const patientInfoDiv = document.getElementById('patient-info-content');
+  if (patientInfoDiv && patientInfo) {
+    let html = '';
+    
+    // 處理性別顯示
+    if (patientInfo.gender) {
+      let genderText = patientInfo.gender;
+      // 將數字或代碼轉換為文字
+      if (genderText === '1' || genderText.toLowerCase() === 'm') {
+        genderText = '男';
+      } else if (genderText === '2' || genderText.toLowerCase() === 'f') {
+        genderText = '女';
+      }
+      html += `<p>性別: ${genderText}</p>`;
+    }
+    
+    // 添加其他資訊
+    if (patientInfo.age) html += `<p>年齡: ${patientInfo.age}</p>`;
+    if (patientInfo.referno) html += `<p>報告編號: ${patientInfo.referno}</p>`;
+    if (patientInfo.patno) html += `<p>病患編號: ${patientInfo.patno}</p>`;
+    
+    patientInfoDiv.innerHTML = html;
+    
+    // 顯示通知
+    showNotification('已載入病人資料');
   }
 }
 
 function initReportGenerator() {
+  // 從URL參數獲取病人資料（頁面加載時自動執行）
+  getPatientDataFromUrl();
+  
   // 只保留清除按鈕的事件處理
   document.getElementById('clearValues').addEventListener('click', clearValues);
   
