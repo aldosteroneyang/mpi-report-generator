@@ -101,9 +101,49 @@ function processReceivedData(data) {
     showNotification('擴展數據已接收並更新!');
   }
   
-  // 顯示其他擴展數據信息
+  // 處理患者數據並顯示
   if (data.patientData) {
     console.log('患者信息:', data.patientData);
+    
+    // 格式化顯示性別 (1=男性, 2=女性, 其他值顯示原始值)
+    const gender = data.patientData.gender;
+    let genderText = gender;
+    if (gender === '1') {
+      genderText = '性別: 男性';
+    } else if (gender === '2') {
+      genderText = '性別: 女性';
+    } else {
+      genderText = '性別: ' + gender;
+    }
+    
+    // 顯示年齡
+    const ageText = data.patientData.age ? '年齡: ' + data.patientData.age : '';
+    
+    // 顯示病歷號
+    const refernoText = data.patientData.referno ? '病歷號: ' + data.patientData.referno : '';
+    
+    // 顯示病患號碼
+    const patnoText = data.patientData.patno ? '病患號碼: ' + data.patientData.patno : '';
+    
+    // 更新顯示到界面上
+    if (document.getElementById('patientGender')) {
+      document.getElementById('patientGender').textContent = genderText;
+    }
+    
+    if (document.getElementById('patientAge')) {
+      document.getElementById('patientAge').textContent = ageText;
+    }
+    
+    if (document.getElementById('patientReferno')) {
+      document.getElementById('patientReferno').textContent = refernoText;
+    }
+    
+    if (document.getElementById('patientPatno')) {
+      document.getElementById('patientPatno').textContent = patnoText;
+    }
+    
+    // 顯示接收到患者數據的通知
+    showNotification('患者數據已接收並顯示!');
   }
   
   if (data.config) {
