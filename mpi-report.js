@@ -7,46 +7,77 @@
 document.addEventListener('DOMContentLoaded', initReportGenerator);
 
 /**
- * 從URL fragment獲取數據的函數
+ * 從 LocalStorage 獲取數據的函數
  * @returns {boolean} 是否成功獲取並處理數據
  */
 function getDataFromURLParams() {
-  console.log('----------- URL參數解析開始 -----------');
+  console.log('----------- 數據加載開始 -----------');
   console.log('完整URL:', window.location.href);
   
   // 獲取URL fragment (# 後面的部分)
   const fragmentString = window.location.hash.substring(1); // 移除開頭的 # 符號
   console.log('URL fragment:', fragmentString);
   
-  // 檢查是否有數據且以 data= 開頭
-  if (fragmentString && fragmentString.startsWith('data=')) {
-    // 提取編碼數據
-    const encodedData = fragmentString.substring(5); // 移除 'data=' 部分
-    console.log('編碼數據:', encodedData ? `存在 (長度: ${encodedData.length})` : '不存在');
+  // 解析fragment參數
+  const params = new URLSearchParams(fragmentString);
+  const transferId = params.get('transferId');
+  
+  if (transferId) {
+    console.log('找到傳輸ID:', transferId);
     
+    // 嘗試從LocalStorage獲取數據
     try {
-      // 解碼 Base64 資料
-      const jsonString = atob(encodedData);
-      console.log('解碼後JSON長度:', jsonString.length);
-      console.log('解碼後的JSON預覽:', jsonString.length > 100 ? jsonString.substring(0, 100) + '...' : jsonString);
+      const storedData = localStorage.getItem(transferId);
       
-      const data = JSON.parse(jsonString);
-      console.log('解析後的數據對象結構:', Object.keys(data));
-      
-      // 處理數據
-      console.log('將數據傳遞給handlePatientData處理');
-      handlePatientData(data);
-      console.log('----------- URL參數解析完成 -----------');
-      return true;
+      if (storedData) {
+        console.log('從LocalStorage獲取數據成功，數據長度:', storedData.length);
+        
+        // 解析JSON數據
+        const data = JSON.parse(storedData);
+        console.log('解析後的數據對象結構:', Object.keys(data));
+        
+        // 處理數據
+        handlePatientData(data);
+        console.log('----------- 數據處理完成 -----------');
+        
+        // 可選：處理完數據後從LocalStorage中刪除
+        // localStorage.removeItem(transferId);
+        
+        return true;
+      } else {
+        console.error('LocalStorage中沒有找到對應數據');
+        showNotification('無法獲取患者資料，請重試。');
+        console.log('----------- 數據加載失敗 -----------');
+        return false;
+      }
     } catch (e) {
-      console.error('解析URL資料時出錯:', e);
+      console.error('從LocalStorage獲取數據時出錯:', e);
       console.error('錯誤位置:', e.stack);
-      showNotification('解析URL資料時發生錯誤: ' + e.message);
-      console.log('----------- URL參數解析失敗 -----------');
+      showNotification('解析患者資料時出錯: ' + e.message);
+      console.log('----------- 數據加載失敗 -----------');
       return false;
     }
   } else {
-    // 也嘗試從URL搜索參數獲取數據 (向下兼容)
+    // 向後兼容 - 嘗試其他數據傳輸方式
+    
+    // 1. 檢查舊的 #data= 方式
+    if (fragmentString && fragmentString.startsWith('data=')) {
+      console.log('檢測到舊版 #data= 格式的數據');
+      const encodedData = fragmentString.substring(5); // 移除 'data=' 部分
+      
+      try {
+        // 解碼 Base64 資料
+        const jsonString = atob(encodedData);
+        const data = JSON.parse(jsonString);
+        handlePatientData(data);
+        console.log('----------- 數據處理完成 (舊版格式) -----------');
+        return true;
+      } catch (e) {
+        console.error('解析舊版數據格式時出錯:', e);
+      }
+    }
+    
+    // 2. 檢查URL搜索參數中的 data 參數
     const urlParams = new URLSearchParams(window.location.search);
     const searchEncodedData = urlParams.get('data');
     
@@ -57,15 +88,15 @@ function getDataFromURLParams() {
         const jsonString = atob(searchEncodedData);
         const data = JSON.parse(jsonString);
         handlePatientData(data);
-        console.log('----------- URL參數解析完成(搜索參數) -----------');
+        console.log('----------- 數據處理完成 (搜索參數) -----------');
         return true;
       } catch (e) {
         console.error('解析URL搜索參數時出錯:', e);
       }
     }
     
-    console.log('URL中沒有找到data參數 (無fragment或搜索參數)');
-    console.log('----------- URL參數解析結束 -----------');
+    console.log('未找到任何數據源 (無 transferId, fragment data 或搜索參數)');
+    console.log('----------- 數據加載結束 -----------');
     
     // 添加一個測試按鈕，方便開發測試
     addTestButton();
@@ -80,20 +111,37 @@ function addTestButton() {
   // 避免重複添加
   if (document.getElementById('testDataBtn')) return;
   
-  // 創建測試按鈕
+  // 建立按鈕容器
+  const btnContainer = document.createElement('div');
+  btnContainer.style.position = 'fixed';
+  btnContainer.style.top = '10px';
+  btnContainer.style.right = '200px';
+  btnContainer.style.zIndex = '1000';
+  btnContainer.style.display = 'flex';
+  btnContainer.style.flexDirection = 'column';
+  btnContainer.style.gap = '5px';
+  
+  // 創建直接測試按鈕
   const testBtn = document.createElement('button');
   testBtn.id = 'testDataBtn';
   testBtn.textContent = '測試患者資料';
-  testBtn.style.position = 'fixed';
-  testBtn.style.top = '10px';
-  testBtn.style.right = '200px';
-  testBtn.style.zIndex = '1000';
   testBtn.style.padding = '5px 10px';
   testBtn.style.backgroundColor = '#f0ad4e';
   testBtn.style.color = 'white';
   testBtn.style.border = 'none';
   testBtn.style.borderRadius = '3px';
   testBtn.style.cursor = 'pointer';
+  
+  // 創建LocalStorage測試按鈕
+  const testLSBtn = document.createElement('button');
+  testLSBtn.id = 'testLSBtn';
+  testLSBtn.textContent = '測試LocalStorage';
+  testLSBtn.style.padding = '5px 10px';
+  testLSBtn.style.backgroundColor = '#5bc0de';
+  testLSBtn.style.color = 'white';
+  testLSBtn.style.border = 'none';
+  testLSBtn.style.borderRadius = '3px';
+  testLSBtn.style.cursor = 'pointer';
   
   // 添加測試資料處理事件
   testBtn.addEventListener('click', function() {
@@ -111,8 +159,51 @@ function addTestButton() {
     });
   });
   
+  // 添加LocalStorage測試事件
+  testLSBtn.addEventListener('click', function() {
+    console.log('LocalStorage測試按鈕點擊');
+    
+    // 生成測試資料
+    const testData = {
+      mciid: "LS-TEST-" + Math.floor(Math.random() * 1000),
+      patientInfo: {
+        gender: "F",
+        age: "42",
+        referno: "LS-" + Math.floor(Math.random() * 10000),
+        patno: "PAT-" + Math.floor(Math.random() * 10000)
+      }
+    };
+    
+    // 生成唯一ID
+    const transferId = 'test-' + Date.now();
+    
+    try {
+      // 存儲數據到LocalStorage
+      localStorage.setItem(transferId, JSON.stringify(testData));
+      console.log('測試數據已存儲到LocalStorage, ID:', transferId);
+      
+      // 測試從LocalStorage讀取數據
+      const storedData = localStorage.getItem(transferId);
+      if (storedData) {
+        const data = JSON.parse(storedData);
+        handlePatientData(data);
+        showNotification('從LocalStorage加載數據成功，ID: ' + transferId);
+      } else {
+        console.error('無法從LocalStorage讀取剛存儲的數據');
+        showNotification('測試失敗：無法讀取存儲的數據');
+      }
+    } catch (e) {
+      console.error('LocalStorage測試出錯:', e);
+      showNotification('LocalStorage測試出錯: ' + e.message);
+    }
+  });
+  
+  // 添加到按鈕容器
+  btnContainer.appendChild(testBtn);
+  btnContainer.appendChild(testLSBtn);
+  
   // 添加到頁面
-  document.body.appendChild(testBtn);
+  document.body.appendChild(btnContainer);
   console.log('已添加測試按鈕');
 }
 

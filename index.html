@@ -345,6 +345,10 @@
       <button id="debugAddData" style="padding: 3px 8px; margin-right: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">添加測試參數</button>
       <button id="debugClearData" style="padding: 3px 8px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">清除參數</button>
     </div>
+    <div style="margin-top: 10px;">
+      <button id="debugLocalStorage" style="padding: 3px 8px; margin-right: 5px; background: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;">LocalStorage測試</button>
+      <button id="debugCheckStorage" style="padding: 3px 8px; background: #6c757d; color: white; border: none; border-radius: 3px; cursor: pointer;">檢查Storage</button>
+    </div>
   </div>
 </div>
 
@@ -421,6 +425,68 @@ document.addEventListener('DOMContentLoaded', function() {
       url.searchParams.set('data', base64Data);
       console.log('新的URL (搜索參數):', url.toString());
       window.location.href = url.toString();
+    }
+  });
+  
+  // 綁定 LocalStorage 測試按鈕
+  document.getElementById('debugLocalStorage').addEventListener('click', function() {
+    const testData = {
+      mciid: "LS-TEST-123",
+      patientInfo: {
+        gender: "F",
+        age: "42",
+        referno: "LS-REF-789",
+        patno: "LS-PAT-456"
+      }
+    };
+    
+    // 生成唯一ID
+    const transferId = 'test-' + Date.now();
+    
+    // 將數據存儲到 LocalStorage
+    try {
+      localStorage.setItem(transferId, JSON.stringify(testData));
+      console.log('測試數據已存儲到 LocalStorage, ID:', transferId);
+      
+      // 構造新URL並重定向
+      const url = new URL(window.location.href);
+      url.hash = `transferId=${transferId}`;
+      console.log('新的URL (LocalStorage):', url.toString());
+      window.location.href = url.toString();
+    } catch (e) {
+      console.error('存儲數據到 LocalStorage 時出錯:', e);
+      alert('存儲數據到 LocalStorage 時出錯: ' + e.message);
+    }
+  });
+  
+  // 綁定檢查 Storage 按鈕
+  document.getElementById('debugCheckStorage').addEventListener('click', function() {
+    // 獲取 URL fragment 中的 transferId
+    const fragmentString = window.location.hash.substring(1);
+    const params = new URLSearchParams(fragmentString);
+    const transferId = params.get('transferId');
+    
+    if (transferId) {
+      const storedData = localStorage.getItem(transferId);
+      if (storedData) {
+        alert(`找到 ID 為 ${transferId} 的數據:\n${storedData.substring(0, 200)}${storedData.length > 200 ? '...' : ''}`);
+      } else {
+        alert(`LocalStorage 中沒有找到 ID 為 ${transferId} 的數據`);
+      }
+    } else {
+      // 顯示所有 LocalStorage 內容
+      let allItems = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const value = localStorage.getItem(key);
+        allItems.push(`${key}: ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`);
+      }
+      
+      if (allItems.length > 0) {
+        alert(`LocalStorage 中的所有項目:\n${allItems.join('\n\n')}`);
+      } else {
+        alert('LocalStorage 為空');
+      }
     }
   });
   

@@ -6,9 +6,15 @@
 
 ## 患者資料傳輸機制
 
-擴充功能使用以下方式將患者資料傳送到報告生成器視窗：
+擴充功能使用 LocalStorage 方式將患者資料傳送到報告生成器視窗：
 
-1. **URL Fragment 傳輸** (主要方式)：資料被編碼為 Base64 字符串，附加在 URL 的 fragment 部分 (#後面)
+1. **LocalStorage 傳輸** (主要方式)：資料被存儲在瀏覽器的 LocalStorage 中，然後通過一個唯一 ID 在頁面間共享
+
+這種方法的優點：
+- 可以處理較大的數據量，無URL長度限制
+- 不會觸發頁面導航，保持與原始頁面的連結
+- 數據不會被發送到服務器，更安全
+- 實現簡單，兼容性好
 
 ## 接收患者資料的方法
 
@@ -17,35 +23,45 @@
 ```javascript
 // 當文檔完成載入時執行
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('報告生成器：頁面已載入，開始檢查fragment數據');
+    console.log('報告生成器：頁面已載入，開始檢查數據');
     
-    // 解析URL fragment
-    const fragmentString = window.location.hash.substring(1); // 移除開頭的 # 符號
+    // 解析URL fragment獲取傳輸ID
+    const fragmentString = window.location.hash.substring(1);
     console.log('報告生成器：URL fragment:', fragmentString);
     
-    // 檢查是否有數據
-    if (fragmentString && fragmentString.startsWith('data=')) {
-        // 提取編碼數據
-        const encodedData = fragmentString.substring(5); // 移除 'data=' 部分
-        console.log('報告生成器：編碼數據:', encodedData ? encodedData.substring(0, 50) + '...' : '無');
+    // 解析fragment參數
+    const params = new URLSearchParams(fragmentString);
+    const transferId = params.get('transferId');
+    
+    if (transferId) {
+        console.log('報告生成器：找到傳輸ID:', transferId);
         
+        // 嘗試從LocalStorage獲取數據
         try {
-            // 解碼 Base64 資料
-            const jsonString = atob(encodedData);
-            console.log('報告生成器：解碼後的JSON:', jsonString.substring(0, 100) + '...');
+            const storedData = localStorage.getItem(transferId);
             
-            // 解析JSON
-            const data = JSON.parse(jsonString);
-            console.log('報告生成器：解析後的數據對象:', data);
-            
-            // 處理數據
-            processReceivedData(data);
+            if (storedData) {
+                console.log('報告生成器：從LocalStorage獲取數據成功');
+                
+                // 解析JSON數據
+                const data = JSON.parse(storedData);
+                console.log('報告生成器：解析後的數據對象:', data);
+                
+                // 處理數據
+                processReceivedData(data);
+                
+                // 可選：處理完數據後從LocalStorage中刪除
+                // localStorage.removeItem(transferId);
+            } else {
+                console.error('報告生成器：LocalStorage中沒有找到對應數據');
+                showErrorMessage('無法獲取患者資料，請重試。');
+            }
         } catch (e) {
-            console.error('報告生成器：解析URL資料時出錯:', e);
-            showErrorMessage('無法解析數據，請檢查控制台錯誤。');
+            console.error('報告生成器：從LocalStorage獲取數據時出錯:', e);
+            showErrorMessage('解析患者資料時出錯，請檢查控制台錯誤。');
         }
     } else {
-        console.log('報告生成器：URL fragment中沒有找到數據');
+        console.log('報告生成器：URL中沒有找到傳輸ID');
     }
     
     // 顯示錯誤消息的函數
@@ -88,21 +104,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // 處理文本值
-        if (data.values) {
+        if (data.textValues) {
             console.log('報告生成器：接收到文本值');
             // 尋找頁面上的文本區域
             const textareas = document.querySelectorAll('textarea');
             if (textareas.length > 0) {
-                if (Array.isArray(data.values)) {
+                if (Array.isArray(data.textValues)) {
                     // 按順序填充
-                    for (let i = 0; i < Math.min(textareas.length, data.values.length); i++) {
-                        if (data.values[i]) {
-                            textareas[i].value = data.values[i];
+                    for (let i = 0; i < Math.min(textareas.length, data.textValues.length); i++) {
+                        if (data.textValues[i]) {
+                            textareas[i].value = data.textValues[i];
                         }
                     }
-                } else if (typeof data.values === 'object') {
+                } else if (typeof data.textValues === 'object') {
                     // 按名稱填充
-                    for (const [key, value] of Object.entries(data.values)) {
+                    for (const [key, value] of Object.entries(data.textValues)) {
                         const textarea = document.querySelector(`textarea[name="${key}"], textarea#${key}`);
                         if (textarea) {
                             textarea.value = value;
@@ -295,12 +311,21 @@ function displayPatientInfo(gender, age, referno, patno) {
 </html>
 ```
 
-## 使用 URL Fragment 的優點
+## 使用 LocalStorage 的優點
 
-1. **不干擾頁面導航**: 使用 URL Fragment (#) 不會觸發頁面重新加載或導航
-2. **保持與原始頁面的連接**: 不會破壞與原始頁面的連結關係
-3. **安全**: 參數不會被發送到服務器，減少數據暴露風險
-4. **容易實現**: 不需要額外的服務器支持
+1. **處理大量數據**: 不受URL長度限制，可處理較大的文本數據
+2. **不干擾頁面導航**: 不會觸發頁面重新加載或導航
+3. **保持與原始頁面的連接**: 不會破壞與原始頁面的連結關係
+4. **安全**: 數據只存儲在本地瀏覽器，不會被發送到服務器
+5. **自動清理**: 設置了5分鐘自動清理機制，避免佔用過多存儲空間
+
+## 使用注意事項
+
+1. **同源限制**: LocalStorage 受同源策略限制，確保報告生成器與原始頁面在同一域名下
+2. **存儲空間**: 每個域名的 LocalStorage 存儲空間大約有 5-10MB，足夠大多數使用場景
+3. **清理機制**: 數據會在 5 分鐘後自動清理，確保不會長期佔用存儲空間
+4. **數據格式**: 使用 JSON 格式存儲和傳輸，確保數據類型一致性
+5. **錯誤處理**: 添加了完善的錯誤處理機制，確保在各種情況下仍能正常工作
 
 ## 測試方法
 
@@ -317,21 +342,17 @@ function displayPatientInfo(gender, age, referno, patno) {
    });
    ```
 
-2. **URL Fragment測試**: 手動添加fragment測試
-   ```
-   您的網址#data=eyJtY2lpZCI6IjkzMTAzMDgiLCJwYXRpZW50SW5mbyI6eyJnZW5kZXIiOiJNIiwiYWdlIjoiNjUiLCJyZWZlcm5vIjoiOTMxMTMzUDAyOTUwIiwicGF0bm8iOiIxMjM0NSJ9fQ==
-   ```
-
-3. **擴充功能測試**: 啟用擴充功能並點擊「開啟報告生成器」按鈕
+2. **擴充功能測試**: 啟用擴充功能並點擊「開啟報告生成器」按鈕，擴充功能會自動處理數據傳輸
 
 ## 故障排除
 
 如遇問題，請檢查:
 
 1. **控制台日誌**: 檢查瀏覽器控制台中的詳細日誌訊息
-2. **Hash值**: 確認URL hash部分是否包含有效的Base64編碼數據
-3. **DOM元素**: 確認患者資訊欄位的ID和選擇器正確
+2. **LocalStorage**: 使用開發者工具 Application > Storage > Local Storage 檢查是否包含患者數據
+3. **跨域問題**: 確認報告生成器與原始頁面在同一域名下
+4. **存儲空間**: 確認 LocalStorage 空間是否足夠，可能需要清理一些舊數據
 
 ---
 
-如有任何問題或需要技術支援，請聯繫擴充功能開發團隊。
+如有任何問題或需要技術支援，請聯繫擴充功能開發團隊。 
