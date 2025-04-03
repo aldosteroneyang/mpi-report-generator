@@ -198,16 +198,9 @@
       user-select: none;     /* 防止文字被選中 */
     }
     
-    /* 按鈕容器樣式 */
-    .buttons-container {
-      display: flex;
-      flex-direction: row;
-      gap: 10px;
-      margin-top: 15px;
-    }
-    
     /* 發送數據按鈕樣式 */
     .send-data-btn {
+      margin-top: 15px;
       padding: 10px 15px;
       background-color: #4CAF50;
       color: white;
@@ -217,29 +210,10 @@
       font-size: 14px;
       font-weight: bold;
       transition: background-color 0.3s;
-      flex: 1;
     }
     
     .send-data-btn:hover {
       background-color: #45a049;
-    }
-    
-    /* 載入病人資料按鈕樣式 */
-    .import-data-btn {
-      padding: 10px 15px;
-      background-color: #2196F3;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: bold;
-      transition: background-color 0.3s;
-      flex: 1;
-    }
-    
-    .import-data-btn:hover {
-      background-color: #0b7dda;
     }
     
     /* 響應式調整 */
@@ -258,15 +232,6 @@
         height: 400px;
       }
     }
-    
-    /* 患者資訊容器樣式 */
-    .patient-info-container {
-      margin-bottom: 20px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-      background-color: #f9f9f9;
-    }
   </style>
 </head>
 <body>
@@ -284,13 +249,18 @@
 
 <!-- 右側：操作和報告區域 -->
 <div class="right-container">
-  <!-- 病人資料顯示區塊 -->
-  <div id="patient-info" class="patient-info-container">
-    <!-- 患者資訊將被動態填入此處 -->
-    <div class="result-header">病人資料</div>
-    <div class="result-box" id="patient-info-content"></div>
+  <!-- 患者資料顯示區域 -->
+  <div id="patientInfoContainer" class="result-container" style="margin-bottom: 15px;">
+    <div class="result-header">Patient Information</div>
+    <div class="result-box" id="patientInfoBox">
+      <div><span style="font-weight: bold;">性別：</span><span id="gender">-</span></div>
+      <div><span style="font-weight: bold;">年齡：</span><span id="age">-</span></div>
+      <div><span style="font-weight: bold;">報告編號：</span><span id="referno">-</span></div>
+      <div><span style="font-weight: bold;">病患編號：</span><span id="patno">-</span></div>
+      <div><span style="font-weight: bold;">MCIID：</span><span id="mciid">-</span></div>
+    </div>
   </div>
-
+  
   <!-- 下拉選單 -->
   <div class="dropdown-container">
     <select id="medicationSelect">
@@ -330,10 +300,9 @@
   </div>
   
   <!-- 添加發送數據按鈕 -->
-  <div class="buttons-container">
-    <button id="sendDataBtn" class="send-data-btn">Send report data</button>
-    <button id="importDataBtn" class="import-data-btn">Import patient data</button>
-  </div>
+  <button id="sendDataBtn" class="send-data-btn">Send report data</button>
+  <!-- 添加導入資料按鈕 -->
+  <button id="importDataBtn" class="send-data-btn" style="background-color: #007bff; margin-top: 10px;">Import patient data</button>
 </div>
 
 <!-- 通知元素 -->
@@ -664,63 +633,6 @@ function sendReportData() {
 
 // 添加發送數據按鈕的事件監聽器
 document.getElementById('sendDataBtn').addEventListener('click', sendReportData);
-
-// 添加載入病人資料按鈕的事件監聽器
-document.getElementById('importDataBtn').addEventListener('click', importPatientData);
-
-// 手動載入病人資料的函數
-function importPatientData() {
-  // 用戶輸入對話框
-  const userInput = prompt('請輸入病人資料的 JSON 格式，或輸入 "URL" 從 URL 讀取數據：', 
-  '{"type":"GUI_EXTENSION_DATA","patientInfo":{"gender":"2","age":"60","referno":"A123456","patno":"P789"}}');
-  
-  if (!userInput) {
-    return; // 用戶取消
-  }
-
-  try {
-    // 如果用戶輸入 "URL"，則從 URL 參數讀取數據
-    if (userInput.trim().toUpperCase() === 'URL') {
-      if (typeof getPatientDataFromUrl === 'function') {
-        getPatientDataFromUrl();
-      } else {
-        // 如果函數不可用，顯示錯誤
-        showNotificationMessage('無法從 URL 讀取數據，函數未找到');
-      }
-      return;
-    }
-    
-    // 否則解析用戶輸入的 JSON
-    const data = JSON.parse(userInput);
-    
-    if (data && data.patientInfo) {
-      if (typeof handlePatientInfo === 'function') {
-        handlePatientInfo(data.patientInfo);
-      } else {
-        // 顯示通知
-        showNotificationMessage('函數未找到，無法處理病人資料');
-      }
-    } else {
-      throw new Error('數據缺少 patientInfo 欄位');
-    }
-  } catch (e) {
-    // 顯示錯誤通知
-    showNotificationMessage('解析數據時出錯：' + e.message);
-    console.error('解析或處理資料時出錯：', e);
-  }
-}
-
-// 顯示通知消息的函數
-function showNotificationMessage(message) {
-  const notification = document.getElementById('notification');
-  notification.textContent = message;
-  notification.style.visibility = 'visible';
-  
-  // 3秒後隱藏通知
-  setTimeout(() => {
-    notification.style.visibility = 'hidden';
-  }, 3000);
-}
 </script>
 
 <!-- 引入報告生成相關的 JavaScript -->

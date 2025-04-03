@@ -17,18 +17,7 @@ function receiveReportData(event) {
   // 安全檢查，確保數據來源可信
   console.log('Received message from:', event.origin);
   
-  // 檢查是否是擴充功能傳來的病人資料
-  if (event.data && event.data.type === 'GUI_EXTENSION_DATA') {
-    console.log('Received patient data via postMessage:', event.data);
-    
-    // 處理患者資訊
-    if (event.data.patientInfo) {
-      handlePatientInfo(event.data.patientInfo);
-    }
-    return;
-  }
-  
-  // 檢查數據是否存在且為對象類型（報告數據）
+  // 檢查數據是否存在且為對象類型
   if (event.data && typeof event.data === 'object') {
     console.log('Received report data:', event.data);
     
@@ -57,73 +46,7 @@ function receiveReportData(event) {
   }
 }
 
-/**
- * 從URL參數獲取病人資料
- */
-function getPatientDataFromUrl() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const encodedData = urlParams.get('data');
-  
-  if (encodedData) {
-    try {
-      // 解碼 Base64 資料
-      const jsonString = atob(encodedData);
-      const data = JSON.parse(jsonString);
-      
-      console.log('從 URL 參數接收到資料:', data);
-      
-      // 檢查是否包含患者資訊
-      if (data.patientInfo) {
-        handlePatientInfo(data.patientInfo);
-      }
-    } catch (e) {
-      console.error('解析 URL 資料時出錯:', e);
-    }
-  }
-}
-
-/**
- * 處理患者資訊的函數
- * @param {Object} patientInfo - 患者資訊對象
- */
-function handlePatientInfo(patientInfo) {
-  if (!patientInfo) return;
-  
-  console.log('接收到患者資訊:', patientInfo);
-  
-  // 在特定區塊顯示患者資訊
-  const patientInfoDiv = document.getElementById('patient-info-content');
-  if (patientInfoDiv && patientInfo) {
-    let html = '';
-    
-    // 處理性別顯示
-    if (patientInfo.gender) {
-      let genderText = patientInfo.gender;
-      // 將數字或代碼轉換為文字
-      if (genderText === '1' || genderText.toLowerCase() === 'm') {
-        genderText = '男';
-      } else if (genderText === '2' || genderText.toLowerCase() === 'f') {
-        genderText = '女';
-      }
-      html += `<p>性別: ${genderText}</p>`;
-    }
-    
-    // 添加其他資訊
-    if (patientInfo.age) html += `<p>年齡: ${patientInfo.age}</p>`;
-    if (patientInfo.referno) html += `<p>報告編號: ${patientInfo.referno}</p>`;
-    if (patientInfo.patno) html += `<p>病患編號: ${patientInfo.patno}</p>`;
-    
-    patientInfoDiv.innerHTML = html;
-    
-    // 顯示通知
-    showNotification('已載入病人資料');
-  }
-}
-
 function initReportGenerator() {
-  // 從URL參數獲取病人資料（頁面加載時自動執行）
-  getPatientDataFromUrl();
-  
   // 只保留清除按鈕的事件處理
   document.getElementById('clearValues').addEventListener('click', clearValues);
   
@@ -982,4 +905,177 @@ function capitalizeFirstCharacter(sentence) {
 
 function prefixArrayElementsWithIndex(arr) {
   return arr.map((element, index) => `${index + 1}. ${element}`);
+}
+
+// 當文檔完成載入時設置監聽器
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('報告生成器：頁面已載入，等待患者資料...');
+    
+    // 設置全局變數存儲患者資料
+    window.patientData = null;
+    
+    // 設置 postMessage 監聽器
+    window.addEventListener('message', function(event) {
+        // 檢查資料來源安全性 (可選，但建議使用)
+        // 如果您知道原始頁面的確切域名，可以取消註釋以下行並設置正確的域名
+        // if (event.origin !== 'http://your-original-domain.com') return;
+        
+        console.log('報告生成器：收到訊息', event.data);
+        
+        // 驗證資料
+        if (!event.data || typeof event.data !== 'object') {
+            console.error('報告生成器：收到無效資料格式');
+            return;
+        }
+        
+        // 處理資料
+        if (event.data.type === 'GUI_EXTENSION_DATA') {
+            console.log('報告生成器：收到GUI擴充功能資料');
+            
+            // 存儲完整資料
+            window.patientData = event.data;
+            
+            // 處理患者資訊
+            if (event.data.patientInfo) {
+                console.log('報告生成器：處理患者資訊', event.data.patientInfo);
+                handlePatientInfo(event.data.patientInfo);
+            }
+            
+            // 處理其他資料 (如文本值等)
+            if (event.data.textValues) {
+                console.log('報告生成器：處理文本值', event.data.textValues);
+                // 在這裡處理文本值
+                // handleTextValues(event.data.textValues);
+            }
+            
+            // 處理MCIID
+            if (event.data.mciid) {
+                console.log('報告生成器：處理MCIID', event.data.mciid);
+                // 在這裡處理MCIID
+                const mciidElement = document.getElementById('mciid');
+                if (mciidElement) {
+                    mciidElement.textContent = event.data.mciid;
+                }
+            }
+        }
+    });
+    
+    // 如果10秒後仍未收到資料，請求父窗口重新發送
+    setTimeout(function() {
+        if (!window.patientData && window.opener) {
+            console.log('報告生成器：未收到資料，請求資料重發');
+            try {
+                // 向父窗口發送請求
+                window.opener.postMessage({ type: 'REQUEST_DATA' }, '*');
+            } catch (e) {
+                console.error('報告生成器：請求資料失敗', e);
+            }
+        }
+    }, 10000);
+});
+
+// 處理患者資訊的函數
+function handlePatientInfo(patientInfo) {
+    if (!patientInfo) {
+        console.error('報告生成器：收到空的患者資訊');
+        return;
+    }
+    
+    try {
+        // 獲取性別資訊，並做標準化處理
+        let genderText = '';
+        if (patientInfo.gender) {
+            // 將數字或代碼轉換為文字
+            if (patientInfo.gender === 'M' || patientInfo.gender === '1' || 
+                patientInfo.gender.toLowerCase() === 'm' || patientInfo.gender.includes('男')) {
+                genderText = '男';
+            } else if (patientInfo.gender === 'F' || patientInfo.gender === '2' || 
+                patientInfo.gender.toLowerCase() === 'f' || patientInfo.gender.includes('女')) {
+                genderText = '女';
+            } else {
+                genderText = patientInfo.gender; // 使用原始值
+            }
+        }
+        
+        // 獲取其他患者資訊
+        const age = patientInfo.age || '';
+        const referno = patientInfo.referno || '';
+        const patno = patientInfo.patno || '';
+        
+        // 顯示在頁面上
+        displayPatientInfo(genderText, age, referno, patno);
+        
+    } catch (e) {
+        console.error('報告生成器：處理患者資訊時出錯:', e);
+    }
+}
+
+// 在頁面上顯示患者資訊
+function displayPatientInfo(gender, age, referno, patno) {
+    // 尋找頁面上的元素
+    updateElementContent('gender', gender);
+    updateElementContent('age', age);
+    updateElementContent('referno', referno);
+    updateElementContent('patno', patno);
+}
+
+// 更新元素內容的輔助函數
+function updateElementContent(id, value) {
+    // 嘗試多種選擇器
+    const selectors = [
+        `#${id}`, 
+        `[name="${id}"]`, 
+        `.${id}`, 
+        `input[name="${id}"]`, 
+        `span.${id}`,
+        `div.${id}`,
+        `[data-field="${id}"]`
+    ];
+    
+    // 嘗試每一個選擇器
+    for (const selector of selectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+            // 根據元素類型設置內容
+            if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+                element.value = value;
+            } else {
+                element.textContent = value;
+            }
+            console.log(`報告生成器：更新了 ${id} 元素，值為 ${value}`);
+            return true;
+        }
+    }
+    
+    console.log(`報告生成器：未找到 ${id} 元素`);
+    return false;
+}
+
+// 添加 Import patient data 按鈕的點擊事件
+document.addEventListener('DOMContentLoaded', function() {
+    const importDataBtn = document.getElementById('importDataBtn');
+    if (importDataBtn) {
+        importDataBtn.addEventListener('click', importPatientData);
+    }
+});
+
+// 模擬接收測試數據的函數
+function importPatientData() {
+    // 模擬收到 postMessage 資料
+    window.dispatchEvent(new MessageEvent('message', {
+        data: {
+            type: 'GUI_EXTENSION_DATA',
+            mciid: '9310308',
+            patientInfo: {
+                gender: 'M',
+                age: '87',
+                referno: '931025P01283',
+                patno: '02375862'
+            }
+        },
+        origin: window.location.origin // 模擬來自同源
+    }));
+    
+    // 顯示通知
+    showNotification('已導入測試患者資料');
 }
