@@ -6,6 +6,46 @@
 // 等待 DOM 完全加載後初始化
 document.addEventListener('DOMContentLoaded', initReportGenerator);
 
+// 添加窗口消息監聽器，用於接收數據
+window.addEventListener('message', receiveReportData);
+
+/**
+ * 接收從其他窗口傳來的報告數據
+ * @param {MessageEvent} event - 消息事件對象
+ */
+function receiveReportData(event) {
+  // 安全檢查，確保數據來源可信
+  console.log('Received message from:', event.origin);
+  
+  // 檢查數據是否存在且為對象類型
+  if (event.data && typeof event.data === 'object') {
+    console.log('Received report data:', event.data);
+    
+    // 處理接收到的數據
+    const reportData = event.data;
+    
+    // 如果界面上有對應的元素，則更新內容
+    if (reportData.Procedure && document.getElementById('procedureBox')) {
+      document.getElementById('procedureBox').textContent = reportData.Procedure;
+    }
+    
+    if (reportData.Findings && document.getElementById('findingsBox')) {
+      document.getElementById('findingsBox').textContent = reportData.Findings;
+    }
+    
+    if (reportData.Impression && document.getElementById('impressionBox')) {
+      document.getElementById('impressionBox').textContent = reportData.Impression;
+    }
+    
+    if (reportData.Addendum && document.getElementById('addendumBox')) {
+      document.getElementById('addendumBox').textContent = reportData.Addendum;
+    }
+    
+    // 顯示接收成功通知
+    showNotification('報告數據已接收並更新!');
+  }
+}
+
 function initReportGenerator() {
   // 只保留清除按鈕的事件處理
   document.getElementById('clearValues').addEventListener('click', clearValues);
