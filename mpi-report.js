@@ -19,30 +19,61 @@ function receiveReportData(event) {
   
   // 檢查數據是否存在且為對象類型
   if (event.data && typeof event.data === 'object') {
-    console.log('Received report data:', event.data);
+    console.log('Received data:', event.data);
     
     // 處理接收到的數據
-    const reportData = event.data;
+    const data = event.data;
     
-    // 如果界面上有對應的元素，則更新內容
-    if (reportData.Procedure && document.getElementById('procedureBox')) {
-      document.getElementById('procedureBox').textContent = reportData.Procedure;
+    // 處理 GUI_EXTENSION_DATA 類型的消息（患者資料）
+    if (data.type === 'GUI_EXTENSION_DATA') {
+      console.log('報告生成器：收到GUI擴充功能資料');
+      
+      // 存儲完整資料
+      window.patientData = data;
+      
+      // 處理患者資訊
+      if (data.patientInfo) {
+        console.log('報告生成器：處理患者資訊', data.patientInfo);
+        handlePatientInfo(data.patientInfo);
+      }
+      
+      // 處理MCIID
+      if (data.mciid) {
+        console.log('報告生成器：處理MCIID', data.mciid);
+        const mciidElement = document.getElementById('mciid');
+        if (mciidElement) {
+          mciidElement.textContent = data.mciid;
+        }
+      }
+      
+      // 顯示通知
+      showNotification('已接收並更新患者資料');
+      return;
     }
     
-    if (reportData.Findings && document.getElementById('findingsBox')) {
-      document.getElementById('findingsBox').textContent = reportData.Findings;
+    // 處理報告數據（原始功能）
+    if (data.Procedure || data.Findings || data.Impression || data.Addendum) {
+      // 如果界面上有對應的元素，則更新內容
+      if (data.Procedure && document.getElementById('procedureBox')) {
+        document.getElementById('procedureBox').textContent = data.Procedure;
+      }
+      
+      if (data.Findings && document.getElementById('findingsBox')) {
+        document.getElementById('findingsBox').textContent = data.Findings;
+      }
+      
+      if (data.Impression && document.getElementById('impressionBox')) {
+        document.getElementById('impressionBox').textContent = data.Impression;
+      }
+      
+      if (data.Addendum && document.getElementById('addendumBox')) {
+        document.getElementById('addendumBox').textContent = data.Addendum;
+      }
+      
+      // 顯示接收成功通知
+      showNotification('報告數據已接收並更新!');
+      return;
     }
-    
-    if (reportData.Impression && document.getElementById('impressionBox')) {
-      document.getElementById('impressionBox').textContent = reportData.Impression;
-    }
-    
-    if (reportData.Addendum && document.getElementById('addendumBox')) {
-      document.getElementById('addendumBox').textContent = reportData.Addendum;
-    }
-    
-    // 顯示接收成功通知
-    showNotification('報告數據已接收並更新!');
   }
 }
 
@@ -914,52 +945,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 設置全局變數存儲患者資料
     window.patientData = null;
     
-    // 設置 postMessage 監聽器
-    window.addEventListener('message', function(event) {
-        // 檢查資料來源安全性 (可選，但建議使用)
-        // 如果您知道原始頁面的確切域名，可以取消註釋以下行並設置正確的域名
-        // if (event.origin !== 'http://your-original-domain.com') return;
-        
-        console.log('報告生成器：收到訊息', event.data);
-        
-        // 驗證資料
-        if (!event.data || typeof event.data !== 'object') {
-            console.error('報告生成器：收到無效資料格式');
-            return;
-        }
-        
-        // 處理資料
-        if (event.data.type === 'GUI_EXTENSION_DATA') {
-            console.log('報告生成器：收到GUI擴充功能資料');
-            
-            // 存儲完整資料
-            window.patientData = event.data;
-            
-            // 處理患者資訊
-            if (event.data.patientInfo) {
-                console.log('報告生成器：處理患者資訊', event.data.patientInfo);
-                handlePatientInfo(event.data.patientInfo);
-            }
-            
-            // 處理其他資料 (如文本值等)
-            if (event.data.textValues) {
-                console.log('報告生成器：處理文本值', event.data.textValues);
-                // 在這裡處理文本值
-                // handleTextValues(event.data.textValues);
-            }
-            
-            // 處理MCIID
-            if (event.data.mciid) {
-                console.log('報告生成器：處理MCIID', event.data.mciid);
-                // 在這裡處理MCIID
-                const mciidElement = document.getElementById('mciid');
-                if (mciidElement) {
-                    mciidElement.textContent = event.data.mciid;
-                }
-            }
-        }
-    });
-    
     // 如果10秒後仍未收到資料，請求父窗口重新發送
     setTimeout(function() {
         if (!window.patientData && window.opener) {
@@ -972,6 +957,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }, 10000);
+    
+    // 註冊導入數據按鈕的事件
+    const importDataBtn = document.getElementById('importDataBtn');
+    if (importDataBtn) {
+        importDataBtn.addEventListener('click', importPatientData);
+    }
 });
 
 // 處理患者資訊的函數
@@ -1051,16 +1042,23 @@ function updateElementContent(id, value) {
     return false;
 }
 
-// 添加 Import patient data 按鈕的點擊事件
-document.addEventListener('DOMContentLoaded', function() {
-    const importDataBtn = document.getElementById('importDataBtn');
-    if (importDataBtn) {
-        importDataBtn.addEventListener('click', importPatientData);
-    }
-});
-
-// 模擬接收測試數據的函數
+// 修改模擬接收測試數據的函數，添加請求真實數據的功能
 function importPatientData() {
+    // 嘗試從父窗口請求真實數據
+    if (window.opener) {
+        try {
+            console.log('報告生成器：正在請求真實患者資料...');
+            // 向父窗口發送請求數據消息
+            window.opener.postMessage({ type: 'REQUEST_DATA' }, '*');
+            showNotification('已向父窗口請求真實患者資料');
+            return;
+        } catch (e) {
+            console.error('報告生成器：請求真實資料失敗', e);
+        }
+    }
+    
+    // 如果無法請求真實數據，則使用測試數據
+    console.log('報告生成器：無法請求真實資料，使用測試資料');
     // 模擬收到 postMessage 資料
     window.dispatchEvent(new MessageEvent('message', {
         data: {
@@ -1077,5 +1075,5 @@ function importPatientData() {
     }));
     
     // 顯示通知
-    showNotification('已導入測試患者資料');
+    showNotification('無法獲取真實患者資料，已導入測試患者資料');
 }
