@@ -184,11 +184,16 @@ function showNotification(message) {
   var notification = document.getElementById('notification');
   notification.innerText = message;
   notification.style.visibility = 'visible';
+  notification.style.backgroundColor = 'rgba(0, 0, 0, 0.8)'; // 增加背景色對比度
+  notification.style.color = '#fff'; // 白色文字
+  notification.style.padding = '15px 20px'; // 增加內邊距
+  notification.style.fontSize = '16px'; // 增加字體大小
+  notification.style.borderRadius = '8px'; // 圓角邊框
 
-  // 3秒後自動隱藏
+  // 5秒後自動隱藏
   setTimeout(function() {
     notification.style.visibility = 'hidden';
-  }, 3000);
+  }, 5000); // 增加顯示時間
 }
 
 /**
@@ -973,49 +978,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // 設置全局變數存儲患者資料
     window.patientData = null;
     
-    // 檢查是否有 opener
+    // 檢查是否有 opener 並發送請求
     if (window.opener) {
-        console.log('報告生成器：檢測到父窗口存在');
-        // 檢查父窗口狀態
-        try {
-            console.log('報告生成器：父窗口狀態:', window.opener ? '存在' : '不存在');
-            console.log('報告生成器：父窗口是否關閉:', window.opener.closed);
-            console.log('報告生成器：父窗口位置:', window.opener.location.href);
-        } catch (e) {
-            console.error('報告生成器：讀取父窗口信息時出錯:', e);
-        }
-        
-        // 立即發送一次請求
-        console.log('報告生成器：立即請求患者資料...');
-        try {
-            const initialRequest = { 
-                type: 'REQUEST_DATA',
-                timestamp: new Date().getTime(),
-                source: 'MPI_REPORT_GENERATOR_INITIAL'
-            };
-            window.opener.postMessage(initialRequest, '*');
-        } catch (e) {
-            console.error('報告生成器：初始請求數據失敗:', e);
-        }
+        console.log('報告生成器：檢測到父窗口存在，準備請求患者資料');
+        // 立即發送初始請求
+        requestPatientDataFromParent('MPI_REPORT_GENERATOR_INITIAL');
+        showNotification('報告生成器已載入，正在請求患者資料...');
     } else {
         console.log('報告生成器：沒有檢測到父窗口');
+        showNotification('無法與父窗口通訊，請直接使用測試資料');
     }
     
     // 稍後再嘗試如果還沒收到資料
     setTimeout(function() {
         if (!window.patientData && window.opener) {
             console.log('報告生成器：3秒後未收到資料，請求資料重發');
-            try {
-                // 向父窗口發送請求
-                const retryRequest = { 
-                    type: 'REQUEST_DATA',
-                    timestamp: new Date().getTime(),
-                    source: 'MPI_REPORT_GENERATOR_RETRY'
-                };
-                window.opener.postMessage(retryRequest, '*');
-            } catch (e) {
-                console.error('報告生成器：請求資料重發失敗:', e);
-            }
+            requestPatientDataFromParent('MPI_REPORT_GENERATOR_RETRY');
         }
     }, 3000);
     
@@ -1023,17 +1001,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         if (!window.patientData && window.opener) {
             console.log('報告生成器：10秒後依然未收到資料，最後一次嘗試請求');
-            try {
-                // 向父窗口發送請求
-                const finalRequest = { 
-                    type: 'REQUEST_DATA',
-                    timestamp: new Date().getTime(),
-                    source: 'MPI_REPORT_GENERATOR_FINAL'
-                };
-                window.opener.postMessage(finalRequest, '*');
-            } catch (e) {
-                console.error('報告生成器：最後嘗試請求資料失敗:', e);
-            }
+            requestPatientDataFromParent('MPI_REPORT_GENERATOR_FINAL');
         }
     }, 10000);
     
@@ -1142,33 +1110,15 @@ function updateElementContent(id, value) {
 // 修改模擬接收測試數據的函數，添加請求真實數據的功能
 function importPatientData() {
     console.log('報告生成器：開始執行 importPatientData 函數');
-    console.log('報告生成器：window.opener 狀態:', window.opener !== null);
     
     // 嘗試從父窗口請求真實數據
     if (window.opener) {
-        try {
-            console.log('報告生成器：正在請求真實患者資料...');
-            
-            // 檢查父窗口是否關閉
-            if (window.opener.closed) {
-                console.error('報告生成器：父窗口已關閉，無法請求資料');
-                showNotification('父窗口已關閉，無法請求資料');
-                useTestData();
-                return;
-            }
-            
-            // 向父窗口發送請求數據消息
-            const requestData = { 
-                type: 'REQUEST_DATA',
-                timestamp: new Date().getTime(),
-                source: 'MPI_REPORT_GENERATOR'
-            };
-            
-            console.log('報告生成器：發送請求:', requestData);
-            window.opener.postMessage(requestData, '*');
-            
+        console.log('報告生成器：正在請求真實患者資料...');
+        
+        // 使用安全的方式發送請求
+        if (requestPatientDataFromParent('MPI_REPORT_GENERATOR_BUTTON_CLICK')) {
             // 顯示通知
-            showNotification('已向父窗口請求真實患者資料');
+            showNotification('已向父窗口請求患者資料，請等待回應');
             
             // 設置一個短期超時，如果父窗口沒有響應，則使用測試數據
             setTimeout(function() {
@@ -1179,9 +1129,6 @@ function importPatientData() {
             }, 5000);
             
             return;
-        } catch (e) {
-            console.error('報告生成器：請求真實資料失敗:', e);
-            showNotification('請求真實資料時出錯: ' + e.message);
         }
     } else {
         console.log('報告生成器：沒有父窗口，無法請求真實資料');
@@ -1212,4 +1159,32 @@ function useTestData() {
     
     // 顯示通知
     showNotification('已導入測試患者資料 (無法獲取真實資料)');
+}
+
+/**
+ * 向父窗口發送獲取患者數據的請求
+ * 專門處理跨域安全通信
+ */
+function requestPatientDataFromParent(source) {
+  if (!window.opener) {
+    console.error('報告生成器：無法發送請求，父窗口不存在');
+    return false;
+  }
+  
+  try {
+    const request = {
+      type: 'REQUEST_DATA',
+      timestamp: new Date().getTime(),
+      source: source || 'MPI_REPORT_GENERATOR'
+    };
+    
+    console.log('報告生成器：發送數據請求:', request);
+    
+    // 使用通配符作為目標源，允許任何域接收消息
+    window.opener.postMessage(request, '*');
+    return true;
+  } catch (error) {
+    console.error('報告生成器：發送請求時出錯:', error);
+    return false;
+  }
 }
