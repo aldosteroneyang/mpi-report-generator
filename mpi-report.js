@@ -7,24 +7,23 @@
 document.addEventListener('DOMContentLoaded', initReportGenerator);
 
 /**
- * 從URL參數獲取數據的函數
+ * 從URL fragment獲取數據的函數
  * @returns {boolean} 是否成功獲取並處理數據
  */
 function getDataFromURLParams() {
   console.log('----------- URL參數解析開始 -----------');
   console.log('完整URL:', window.location.href);
-  const urlParams = new URLSearchParams(window.location.search);
   
-  // 輸出所有URL參數，幫助調試
-  console.log('URL參數列表:');
-  for (const [key, value] of urlParams.entries()) {
-    console.log(`- ${key}: ${value ? (value.length > 50 ? value.substring(0, 50) + '...' : value) : '(空值)'}`);
-  }
+  // 獲取URL fragment (# 後面的部分)
+  const fragmentString = window.location.hash.substring(1); // 移除開頭的 # 符號
+  console.log('URL fragment:', fragmentString);
   
-  const encodedData = urlParams.get('data');
-  console.log('data參數:', encodedData ? `存在 (長度: ${encodedData.length})` : '不存在');
-  
-  if (encodedData) {
+  // 檢查是否有數據且以 data= 開頭
+  if (fragmentString && fragmentString.startsWith('data=')) {
+    // 提取編碼數據
+    const encodedData = fragmentString.substring(5); // 移除 'data=' 部分
+    console.log('編碼數據:', encodedData ? `存在 (長度: ${encodedData.length})` : '不存在');
+    
     try {
       // 解碼 Base64 資料
       const jsonString = atob(encodedData);
@@ -47,7 +46,25 @@ function getDataFromURLParams() {
       return false;
     }
   } else {
-    console.log('URL中沒有找到data參數');
+    // 也嘗試從URL搜索參數獲取數據 (向下兼容)
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchEncodedData = urlParams.get('data');
+    
+    if (searchEncodedData) {
+      console.log('在URL搜索參數中找到數據');
+      try {
+        // 解碼 Base64 資料
+        const jsonString = atob(searchEncodedData);
+        const data = JSON.parse(jsonString);
+        handlePatientData(data);
+        console.log('----------- URL參數解析完成(搜索參數) -----------');
+        return true;
+      } catch (e) {
+        console.error('解析URL搜索參數時出錯:', e);
+      }
+    }
+    
+    console.log('URL中沒有找到data參數 (無fragment或搜索參數)');
     console.log('----------- URL參數解析結束 -----------');
     
     // 添加一個測試按鈕，方便開發測試

@@ -377,7 +377,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 更新調試信息
     if(debugArea.style.display === 'block') {
       document.getElementById('debugUrl').textContent = window.location.href;
-      document.getElementById('debugParams').textContent = window.location.search || '(無)';
+      document.getElementById('debugParams').textContent = 
+          `搜索參數: ${window.location.search || '(無)'}, Fragment: ${window.location.hash || '(無)'}`;
     }
   });
   
@@ -388,6 +389,9 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 綁定添加測試參數按鈕
   document.getElementById('debugAddData').addEventListener('click', function() {
+    // 詢問用戶使用哪種方式添加測試數據
+    const useFragment = confirm('使用 URL fragment (#data=) 添加測試數據? 點擊取消則使用搜索參數 (?data=)');
+    
     const testData = {
       mciid: "123456",
       patientInfo: {
@@ -404,14 +408,27 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 構造新URL並重定向
     const url = new URL(window.location.href);
-    url.searchParams.set('data', base64Data);
-    window.location.href = url.toString();
+    
+    if (useFragment) {
+      // 移除之前的 hash
+      url.hash = '';
+      // 添加新的 fragment 並設置
+      const newUrl = url.toString() + '#data=' + base64Data;
+      console.log('新的URL (fragment):', newUrl);
+      window.location.href = newUrl;
+    } else {
+      // 使用搜索參數
+      url.searchParams.set('data', base64Data);
+      console.log('新的URL (搜索參數):', url.toString());
+      window.location.href = url.toString();
+    }
   });
   
   // 綁定清除參數按鈕
   document.getElementById('debugClearData').addEventListener('click', function() {
     const url = new URL(window.location.href);
     url.search = '';
+    url.hash = '';
     window.location.href = url.toString();
   });
 });
