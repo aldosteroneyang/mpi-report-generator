@@ -6,30 +6,38 @@
 // 等待 DOM 完全加載後初始化
 document.addEventListener('DOMContentLoaded', initReportGenerator);
 
-// 同時在頁面加載時檢查URL參數中的患者數據
-document.addEventListener('DOMContentLoaded', function() {
-  // 檢查URL參數
+/**
+ * 從URL參數獲取數據的函數
+ * @returns {boolean} 是否成功獲取並處理數據
+ */
+function getDataFromURLParams() {
   const urlParams = new URLSearchParams(window.location.search);
   const encodedData = urlParams.get('data');
+  console.log('URL參數:', window.location.search);
+  console.log('編碼數據:', encodedData ? encodedData.substring(0, 50) + '...' : '無');
   
   if (encodedData) {
     try {
       // 解碼 Base64 資料
       const jsonString = atob(encodedData);
-      const data = JSON.parse(jsonString);
+      console.log('解碼後的JSON:', jsonString.substring(0, 100) + '...');
       
-      console.log('從URL參數接收到患者數據:', data);
+      const data = JSON.parse(jsonString);
+      console.log('解析後的數據對象:', data);
       
       // 處理數據
       handlePatientData(data);
+      return true;
     } catch (e) {
       console.error('解析URL資料時出錯:', e);
       showNotification('解析URL資料時發生錯誤');
+      return false;
     }
   } else {
-    console.log('URL參數中沒有找到患者數據');
+    console.log('URL中沒有找到數據參數');
+    return false;
   }
-});
+}
 
 /**
  * 處理患者資料
@@ -143,6 +151,9 @@ function updateElementContent(id, value) {
 }
 
 function initReportGenerator() {
+  // 首先嘗試從URL參數獲取數據
+  getDataFromURLParams();
+
   // 只保留清除按鈕的事件處理
   document.getElementById('clearValues').addEventListener('click', clearValues);
   
