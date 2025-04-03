@@ -6,43 +6,148 @@
 // 等待 DOM 完全加載後初始化
 document.addEventListener('DOMContentLoaded', initReportGenerator);
 
-// 添加窗口消息監聽器，用於接收數據
-window.addEventListener('message', receiveReportData);
+// 初始化數據接收模塊
+document.addEventListener('DOMContentLoaded', initDataReceiver);
 
 /**
- * 接收從其他窗口傳來的報告數據
- * @param {MessageEvent} event - 消息事件對象
+ * 初始化所有數據接收方法
  */
-function receiveReportData(event) {
-  // 安全檢查，確保數據來源可信
-  console.log('Received message from:', event.origin);
+function initDataReceiver() {
+  console.log('初始化數據接收模塊');
   
-  // 檢查數據是否存在且為對象類型
-  if (event.data && typeof event.data === 'object') {
-    console.log('Received report data:', event.data);
+  // 方法1: 檢查 window 對象
+  if (window.GUI_EXTENSION_DATA) {
+    console.log('從 window 對象獲取數據');
+    processReceivedData(window.GUI_EXTENSION_DATA);
+    return;
+  }
+  
+  // 方法2: 檢查 URL 參數
+  const urlParams = new URLSearchParams(window.location.search);
+  const encodedData = urlParams.get('data');
+  if (encodedData) {
+    try {
+      console.log('從 URL 參數獲取數據');
+      const decodedData = JSON.parse(atob(encodedData));
+      processReceivedData(decodedData);
+      return;
+    } catch (e) {
+      console.error('解析 URL 數據失敗:', e);
+    }
+  }
+  
+  // 方法3: 監聽自定義事件
+  window.addEventListener('GUI_DATA_RECEIVED', function(e) {
+    console.log('從自定義事件獲取數據');
+    processReceivedData(e.detail);
+  });
+  
+  // 方法4: 監聽 postMessage (已有，但更新為符合文檔格式)
+  window.addEventListener('message', function(event) {
+    console.log('收到 postMessage 消息:', event.origin, event.data);
     
-    // 處理接收到的數據
-    const reportData = event.data;
-    
-    // 如果界面上有對應的元素，則更新內容
-    if (reportData.Procedure && document.getElementById('procedureBox')) {
-      document.getElementById('procedureBox').textContent = reportData.Procedure;
+    // 處理一般的 postMessage 數據
+    if (event.data && typeof event.data === 'object') {
+      // 如果是擴展發送的特定格式數據
+      if (event.data.type === 'GUI_EXTENSION_DATA') {
+        console.log('從 postMessage 獲取擴展數據');
+        processReceivedData(event.data);
+      } 
+      // 處理原有的報告數據格式
+      else if (event.data.Procedure || event.data.Findings || event.data.Impression || event.data.Addendum) {
+        console.log('從 postMessage 獲取報告數據');
+        processReportData(event.data);
+      }
+    }
+  });
+  
+  // 方法5: 主動請求數據（可選）
+  if (window.opener) {
+    window.opener.postMessage({
+      type: 'GUI_REQUEST_DATA'
+    }, '*');
+  }
+}
+
+/**
+ * 處理接收到的擴展數據
+ * @param {Object} data - 擴展傳送的數據
+ */
+function processReceivedData(data) {
+  console.log('處理接收到的擴展數據', data);
+  
+  // 發送確認回執
+  confirmDataReceived();
+  
+  // 處理擴展數據（如果有textValues）
+  if (data.textValues) {
+    if (data.textValues.Procedure && document.getElementById('procedureBox')) {
+      document.getElementById('procedureBox').textContent = data.textValues.Procedure;
     }
     
-    if (reportData.Findings && document.getElementById('findingsBox')) {
-      document.getElementById('findingsBox').textContent = reportData.Findings;
+    if (data.textValues.Findings && document.getElementById('findingsBox')) {
+      document.getElementById('findingsBox').textContent = data.textValues.Findings;
     }
     
-    if (reportData.Impression && document.getElementById('impressionBox')) {
-      document.getElementById('impressionBox').textContent = reportData.Impression;
+    if (data.textValues.Impression && document.getElementById('impressionBox')) {
+      document.getElementById('impressionBox').textContent = data.textValues.Impression;
     }
     
-    if (reportData.Addendum && document.getElementById('addendumBox')) {
-      document.getElementById('addendumBox').textContent = reportData.Addendum;
+    if (data.textValues.Addendum && document.getElementById('addendumBox')) {
+      document.getElementById('addendumBox').textContent = data.textValues.Addendum;
     }
     
     // 顯示接收成功通知
-    showNotification('報告數據已接收並更新!');
+    showNotification('擴展數據已接收並更新!');
+  }
+  
+  // 顯示其他擴展數據信息
+  if (data.patientData) {
+    console.log('患者信息:', data.patientData);
+  }
+  
+  if (data.config) {
+    console.log('配置信息:', data.config);
+  }
+}
+
+/**
+ * 處理接收到的報告數據（原有格式）
+ * @param {Object} reportData - 報告數據
+ */
+function processReportData(reportData) {
+  console.log('處理接收到的報告數據', reportData);
+  
+  // 如果界面上有對應的元素，則更新內容
+  if (reportData.Procedure && document.getElementById('procedureBox')) {
+    document.getElementById('procedureBox').textContent = reportData.Procedure;
+  }
+  
+  if (reportData.Findings && document.getElementById('findingsBox')) {
+    document.getElementById('findingsBox').textContent = reportData.Findings;
+  }
+  
+  if (reportData.Impression && document.getElementById('impressionBox')) {
+    document.getElementById('impressionBox').textContent = reportData.Impression;
+  }
+  
+  if (reportData.Addendum && document.getElementById('addendumBox')) {
+    document.getElementById('addendumBox').textContent = reportData.Addendum;
+  }
+  
+  // 顯示接收成功通知
+  showNotification('報告數據已接收並更新!');
+}
+
+/**
+ * 發送確認回執
+ */
+function confirmDataReceived() {
+  if (window.opener) {
+    window.opener.postMessage({
+      type: 'GUI_DATA_RECEIVED_ACK'
+    }, '*');
+    console.log('已發送數據接收確認');
   }
 }
 
