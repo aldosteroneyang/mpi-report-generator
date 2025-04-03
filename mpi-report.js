@@ -11,32 +11,92 @@ document.addEventListener('DOMContentLoaded', initReportGenerator);
  * @returns {boolean} 是否成功獲取並處理數據
  */
 function getDataFromURLParams() {
+  console.log('----------- URL參數解析開始 -----------');
+  console.log('完整URL:', window.location.href);
   const urlParams = new URLSearchParams(window.location.search);
+  
+  // 輸出所有URL參數，幫助調試
+  console.log('URL參數列表:');
+  for (const [key, value] of urlParams.entries()) {
+    console.log(`- ${key}: ${value ? (value.length > 50 ? value.substring(0, 50) + '...' : value) : '(空值)'}`);
+  }
+  
   const encodedData = urlParams.get('data');
-  console.log('URL參數:', window.location.search);
-  console.log('編碼數據:', encodedData ? encodedData.substring(0, 50) + '...' : '無');
+  console.log('data參數:', encodedData ? `存在 (長度: ${encodedData.length})` : '不存在');
   
   if (encodedData) {
     try {
       // 解碼 Base64 資料
       const jsonString = atob(encodedData);
-      console.log('解碼後的JSON:', jsonString.substring(0, 100) + '...');
+      console.log('解碼後JSON長度:', jsonString.length);
+      console.log('解碼後的JSON預覽:', jsonString.length > 100 ? jsonString.substring(0, 100) + '...' : jsonString);
       
       const data = JSON.parse(jsonString);
-      console.log('解析後的數據對象:', data);
+      console.log('解析後的數據對象結構:', Object.keys(data));
       
       // 處理數據
+      console.log('將數據傳遞給handlePatientData處理');
       handlePatientData(data);
+      console.log('----------- URL參數解析完成 -----------');
       return true;
     } catch (e) {
       console.error('解析URL資料時出錯:', e);
-      showNotification('解析URL資料時發生錯誤');
+      console.error('錯誤位置:', e.stack);
+      showNotification('解析URL資料時發生錯誤: ' + e.message);
+      console.log('----------- URL參數解析失敗 -----------');
       return false;
     }
   } else {
-    console.log('URL中沒有找到數據參數');
+    console.log('URL中沒有找到data參數');
+    console.log('----------- URL參數解析結束 -----------');
+    
+    // 添加一個測試按鈕，方便開發測試
+    addTestButton();
     return false;
   }
+}
+
+/**
+ * 添加一個測試按鈕，用於測試患者資料顯示功能
+ */
+function addTestButton() {
+  // 避免重複添加
+  if (document.getElementById('testDataBtn')) return;
+  
+  // 創建測試按鈕
+  const testBtn = document.createElement('button');
+  testBtn.id = 'testDataBtn';
+  testBtn.textContent = '測試患者資料';
+  testBtn.style.position = 'fixed';
+  testBtn.style.top = '10px';
+  testBtn.style.right = '200px';
+  testBtn.style.zIndex = '1000';
+  testBtn.style.padding = '5px 10px';
+  testBtn.style.backgroundColor = '#f0ad4e';
+  testBtn.style.color = 'white';
+  testBtn.style.border = 'none';
+  testBtn.style.borderRadius = '3px';
+  testBtn.style.cursor = 'pointer';
+  
+  // 添加測試資料處理事件
+  testBtn.addEventListener('click', function() {
+    console.log('測試按鈕點擊 - 載入示例患者資料');
+    
+    // 使用示例資料
+    handlePatientData({
+      mciid: "123456",
+      patientInfo: {
+        gender: "M",
+        age: "65",
+        referno: "T12345",
+        patno: "P23456"
+      }
+    });
+  });
+  
+  // 添加到頁面
+  document.body.appendChild(testBtn);
+  console.log('已添加測試按鈕');
 }
 
 /**

@@ -332,10 +332,90 @@
   <button id="sendDataBtn" class="send-data-btn">Send report data</button>
 </div>
 
+<!-- 調試工具區域 -->
+<div id="debugArea" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #f8f9fa; border-top: 1px solid #ddd; padding: 10px; font-size: 12px; max-height: 150px; overflow: auto; z-index: 9999;">
+  <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+    <strong>調試工具</strong>
+    <button id="closeDebug" style="border: none; background: none; cursor: pointer; font-size: 14px;">×</button>
+  </div>
+  <div>
+    <div><strong>URL:</strong> <span id="debugUrl"></span></div>
+    <div><strong>參數:</strong> <span id="debugParams"></span></div>
+    <div style="margin-top: 5px;">
+      <button id="debugAddData" style="padding: 3px 8px; margin-right: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">添加測試參數</button>
+      <button id="debugClearData" style="padding: 3px 8px; background: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">清除參數</button>
+    </div>
+  </div>
+</div>
+
 <!-- 通知元素 -->
 <div id="notification" class="notification"></div>
 
 <script>
+// 初始化調試工具
+document.addEventListener('DOMContentLoaded', function() {
+  // 添加調試按鈕
+  const debugBtn = document.createElement('button');
+  debugBtn.textContent = '調試工具';
+  debugBtn.style.position = 'fixed';
+  debugBtn.style.bottom = '10px';
+  debugBtn.style.right = '10px';
+  debugBtn.style.zIndex = '9998';
+  debugBtn.style.padding = '5px 10px';
+  debugBtn.style.backgroundColor = '#6c757d';
+  debugBtn.style.color = 'white';
+  debugBtn.style.border = 'none';
+  debugBtn.style.borderRadius = '3px';
+  debugBtn.style.cursor = 'pointer';
+  document.body.appendChild(debugBtn);
+  
+  // 綁定調試按鈕事件
+  const debugArea = document.getElementById('debugArea');
+  debugBtn.addEventListener('click', function() {
+    debugArea.style.display = debugArea.style.display === 'none' ? 'block' : 'none';
+    
+    // 更新調試信息
+    if(debugArea.style.display === 'block') {
+      document.getElementById('debugUrl').textContent = window.location.href;
+      document.getElementById('debugParams').textContent = window.location.search || '(無)';
+    }
+  });
+  
+  // 綁定關閉按鈕
+  document.getElementById('closeDebug').addEventListener('click', function() {
+    debugArea.style.display = 'none';
+  });
+  
+  // 綁定添加測試參數按鈕
+  document.getElementById('debugAddData').addEventListener('click', function() {
+    const testData = {
+      mciid: "123456",
+      patientInfo: {
+        gender: "M",
+        age: "65",
+        referno: "T12345",
+        patno: "P23456"
+      }
+    };
+    
+    // 編碼數據
+    const jsonStr = JSON.stringify(testData);
+    const base64Data = btoa(jsonStr);
+    
+    // 構造新URL並重定向
+    const url = new URL(window.location.href);
+    url.searchParams.set('data', base64Data);
+    window.location.href = url.toString();
+  });
+  
+  // 綁定清除參數按鈕
+  document.getElementById('debugClearData').addEventListener('click', function() {
+    const url = new URL(window.location.href);
+    url.search = '';
+    window.location.href = url.toString();
+  });
+});
+
 // 創建一個圖表生成函數，可以重複使用
 function createCircleChart(svgId) {
   const svg = document.getElementById(svgId);
