@@ -16,6 +16,7 @@ window.addEventListener('message', receiveReportData);
 function receiveReportData(event) {
   // 安全檢查，確保數據來源可信
   console.log('Received message from:', event.origin);
+  console.log('消息事件完整數據:', event);
   
   // 檢查數據是否存在且為對象類型
   if (event.data && typeof event.data === 'object') {
@@ -48,6 +49,33 @@ function receiveReportData(event) {
       
       // 顯示通知
       showNotification('已接收並更新患者資料');
+      return;
+    }
+    
+    // 處理 REQUEST_DATA_RESPONSE 類型的消息
+    if (data.type === 'REQUEST_DATA_RESPONSE') {
+      console.log('報告生成器：收到重新請求的數據', data);
+      
+      // 存儲完整資料
+      window.patientData = data;
+      
+      // 處理患者資訊
+      if (data.patientInfo) {
+        console.log('報告生成器：處理患者資訊', data.patientInfo);
+        handlePatientInfo(data.patientInfo);
+      }
+      
+      // 處理MCIID
+      if (data.mciid) {
+        console.log('報告生成器：處理MCIID', data.mciid);
+        const mciidElement = document.getElementById('mciid');
+        if (mciidElement) {
+          mciidElement.textContent = data.mciid;
+        }
+      }
+      
+      // 顯示通知
+      showNotification('已接收並更新請求的患者資料');
       return;
     }
     
@@ -945,15 +973,66 @@ document.addEventListener('DOMContentLoaded', function() {
     // 設置全局變數存儲患者資料
     window.patientData = null;
     
-    // 如果10秒後仍未收到資料，請求父窗口重新發送
+    // 檢查是否有 opener
+    if (window.opener) {
+        console.log('報告生成器：檢測到父窗口存在');
+        // 檢查父窗口狀態
+        try {
+            console.log('報告生成器：父窗口狀態:', window.opener ? '存在' : '不存在');
+            console.log('報告生成器：父窗口是否關閉:', window.opener.closed);
+            console.log('報告生成器：父窗口位置:', window.opener.location.href);
+        } catch (e) {
+            console.error('報告生成器：讀取父窗口信息時出錯:', e);
+        }
+        
+        // 立即發送一次請求
+        console.log('報告生成器：立即請求患者資料...');
+        try {
+            const initialRequest = { 
+                type: 'REQUEST_DATA',
+                timestamp: new Date().getTime(),
+                source: 'MPI_REPORT_GENERATOR_INITIAL'
+            };
+            window.opener.postMessage(initialRequest, '*');
+        } catch (e) {
+            console.error('報告生成器：初始請求數據失敗:', e);
+        }
+    } else {
+        console.log('報告生成器：沒有檢測到父窗口');
+    }
+    
+    // 稍後再嘗試如果還沒收到資料
     setTimeout(function() {
         if (!window.patientData && window.opener) {
-            console.log('報告生成器：未收到資料，請求資料重發');
+            console.log('報告生成器：3秒後未收到資料，請求資料重發');
             try {
                 // 向父窗口發送請求
-                window.opener.postMessage({ type: 'REQUEST_DATA' }, '*');
+                const retryRequest = { 
+                    type: 'REQUEST_DATA',
+                    timestamp: new Date().getTime(),
+                    source: 'MPI_REPORT_GENERATOR_RETRY'
+                };
+                window.opener.postMessage(retryRequest, '*');
             } catch (e) {
-                console.error('報告生成器：請求資料失敗', e);
+                console.error('報告生成器：請求資料重發失敗:', e);
+            }
+        }
+    }, 3000);
+    
+    // 如果還未收到數據，再嘗試一次
+    setTimeout(function() {
+        if (!window.patientData && window.opener) {
+            console.log('報告生成器：10秒後依然未收到資料，最後一次嘗試請求');
+            try {
+                // 向父窗口發送請求
+                const finalRequest = { 
+                    type: 'REQUEST_DATA',
+                    timestamp: new Date().getTime(),
+                    source: 'MPI_REPORT_GENERATOR_FINAL'
+                };
+                window.opener.postMessage(finalRequest, '*');
+            } catch (e) {
+                console.error('報告生成器：最後嘗試請求資料失敗:', e);
             }
         }
     }, 10000);
@@ -963,6 +1042,24 @@ document.addEventListener('DOMContentLoaded', function() {
     if (importDataBtn) {
         importDataBtn.addEventListener('click', importPatientData);
     }
+    
+    // 添加控制台調試提示
+    console.info('報告生成器：可以在控制台中運行以下代碼手動測試數據接收:');
+    console.info(`
+    window.dispatchEvent(new MessageEvent('message', {
+        data: {
+            type: 'GUI_EXTENSION_DATA',
+            mciid: '12345678',
+            patientInfo: {
+                gender: 'F',
+                age: '45',
+                referno: 'TEST-REF-123',
+                patno: 'TEST-PAT-456'
+            }
+        },
+        origin: window.location.origin
+    }));
+    `);
 });
 
 // 處理患者資訊的函數
@@ -1044,21 +1141,60 @@ function updateElementContent(id, value) {
 
 // 修改模擬接收測試數據的函數，添加請求真實數據的功能
 function importPatientData() {
+    console.log('報告生成器：開始執行 importPatientData 函數');
+    console.log('報告生成器：window.opener 狀態:', window.opener !== null);
+    
     // 嘗試從父窗口請求真實數據
     if (window.opener) {
         try {
             console.log('報告生成器：正在請求真實患者資料...');
+            
+            // 檢查父窗口是否關閉
+            if (window.opener.closed) {
+                console.error('報告生成器：父窗口已關閉，無法請求資料');
+                showNotification('父窗口已關閉，無法請求資料');
+                useTestData();
+                return;
+            }
+            
             // 向父窗口發送請求數據消息
-            window.opener.postMessage({ type: 'REQUEST_DATA' }, '*');
+            const requestData = { 
+                type: 'REQUEST_DATA',
+                timestamp: new Date().getTime(),
+                source: 'MPI_REPORT_GENERATOR'
+            };
+            
+            console.log('報告生成器：發送請求:', requestData);
+            window.opener.postMessage(requestData, '*');
+            
+            // 顯示通知
             showNotification('已向父窗口請求真實患者資料');
+            
+            // 設置一個短期超時，如果父窗口沒有響應，則使用測試數據
+            setTimeout(function() {
+                if (!window.patientData) {
+                    console.log('報告生成器：請求超時，將使用測試數據');
+                    useTestData();
+                }
+            }, 5000);
+            
             return;
         } catch (e) {
-            console.error('報告生成器：請求真實資料失敗', e);
+            console.error('報告生成器：請求真實資料失敗:', e);
+            showNotification('請求真實資料時出錯: ' + e.message);
         }
+    } else {
+        console.log('報告生成器：沒有父窗口，無法請求真實資料');
     }
     
     // 如果無法請求真實數據，則使用測試數據
-    console.log('報告生成器：無法請求真實資料，使用測試資料');
+    useTestData();
+}
+
+// 使用測試數據的輔助函數
+function useTestData() {
+    console.log('報告生成器：使用測試數據');
+    
     // 模擬收到 postMessage 資料
     window.dispatchEvent(new MessageEvent('message', {
         data: {
@@ -1075,5 +1211,5 @@ function importPatientData() {
     }));
     
     // 顯示通知
-    showNotification('無法獲取真實患者資料，已導入測試患者資料');
+    showNotification('已導入測試患者資料 (無法獲取真實資料)');
 }
