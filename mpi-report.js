@@ -6,6 +6,14 @@
 // 等待 DOM 完全加載後初始化
 document.addEventListener('DOMContentLoaded', initReportGenerator);
 
+function decodeTransferData(encodedData) {
+  try {
+    return decodeURIComponent(escape(atob(encodedData)));
+  } catch (error) {
+    return atob(encodedData);
+  }
+}
+
 /**
  * 從 LocalStorage 獲取數據的函數
  * @returns {boolean} 是否成功獲取並處理數據
@@ -67,7 +75,7 @@ function getDataFromURLParams() {
       
       try {
         // 解碼 Base64 資料
-        const jsonString = atob(encodedData);
+        const jsonString = decodeTransferData(encodedData);
         const data = JSON.parse(jsonString);
         handlePatientData(data);
         console.log('----------- 數據處理完成 (舊版格式) -----------');
@@ -85,7 +93,7 @@ function getDataFromURLParams() {
       console.log('在URL搜索參數中找到數據');
       try {
         // 解碼 Base64 資料
-        const jsonString = atob(searchEncodedData);
+        const jsonString = decodeTransferData(searchEncodedData);
         const data = JSON.parse(jsonString);
         handlePatientData(data);
         console.log('----------- 數據處理完成 (搜索參數) -----------');
@@ -214,6 +222,9 @@ function addTestButton() {
 function handlePatientData(data) {
   // 設置全局變數存儲患者資料
   window.patientData = data;
+  window.guiExtensionData = data && data.type === 'GUI_EXTENSION_DATA' ? data : null;
+  window.guiExtensionAreas = window.guiExtensionData?.areas || {};
+  window.ioContext = getAreaValue(data, 'IO') || data.patientInfo?.io || '';
   
   // 處理患者資訊
   if (data.patientInfo) {
@@ -235,9 +246,24 @@ function handlePatientData(data) {
   if (patientInfoBlock) {
     patientInfoBlock.style.display = 'block';
   }
+
+  if (data.cache?.generatorState) {
+    restoreGeneratorStateFromCache(data.cache.generatorState);
+  }
   
   // 顯示通知
   showNotification('已接收患者資料!');
+}
+
+function getAreaValue(data, key) {
+  const areaValue = data?.areas?.[key];
+  if (areaValue && typeof areaValue === 'object' && Object.prototype.hasOwnProperty.call(areaValue, 'value')) {
+    return areaValue.value || '';
+  }
+  if (typeof areaValue === 'string') {
+    return areaValue;
+  }
+  return data?.textValues?.[key] || '';
 }
 
 /**
@@ -318,6 +344,85 @@ function updateElementContent(id, value) {
   return false;
 }
 
+function clampSegmentValue(value) {
+  const numberValue = parseInt(value, 10);
+  if (Number.isNaN(numberValue)) return 0;
+  return Math.max(0, Math.min(3, numberValue));
+}
+
+function setChartValues(chartId, values) {
+  if (!Array.isArray(values)) return;
+
+  const counts = window[`${chartId}Counts`] || {};
+  values.forEach((value, index) => {
+    const normalizedValue = clampSegmentValue(value);
+    const textElement = document.getElementById(`${chartId}-text-${index}`);
+    const segmentElement = document.getElementById(`${chartId}-segment-${index}`);
+
+    if (textElement) {
+      textElement.textContent = String(normalizedValue);
+    }
+
+    if (segmentElement) {
+      segmentElement.classList.remove('state-0', 'state-1', 'state-2', 'state-3');
+      segmentElement.classList.add(`state-${normalizedValue}`);
+    }
+
+    counts[index] = normalizedValue;
+  });
+  window[`${chartId}Counts`] = counts;
+}
+
+function getGeneratorState() {
+  return {
+    medication: document.getElementById('medicationSelect')?.value || '',
+    aminophylline: document.getElementById('aminophyllineSelect')?.value || '',
+    topChart: collectDiagramValues('topChart'),
+    bottomChart: collectDiagramValues('bottomChart'),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function restoreGeneratorStateFromCache(generatorState) {
+  if (!generatorState || typeof generatorState !== 'object') return;
+
+  if (generatorState.medication && document.getElementById('medicationSelect')) {
+    document.getElementById('medicationSelect').value = generatorState.medication;
+  }
+  if (generatorState.aminophylline && document.getElementById('aminophyllineSelect')) {
+    document.getElementById('aminophyllineSelect').value = generatorState.aminophylline;
+  }
+
+  setChartValues('topChart', generatorState.topChart);
+  setChartValues('bottomChart', generatorState.bottomChart);
+  updateReports();
+  showNotification('已載入此 referno 的 5 天內快取');
+}
+
+function buildCurrentReportAreas() {
+  return {
+    Findings: { value: document.getElementById('findingsBox')?.textContent || '' },
+    Impression: { value: document.getElementById('impressionBox')?.textContent || '' },
+    Addendum: { value: document.getElementById('addendumBox')?.textContent || '' }
+  };
+}
+
+let draftSaveTimer = null;
+function postDraftToOpener() {
+  if (!window.opener) return;
+
+  window.opener.postMessage({
+    type: 'GUI_REPORT_DRAFT',
+    areas: buildCurrentReportAreas(),
+    generatorState: getGeneratorState()
+  }, '*');
+}
+
+function scheduleDraftSave() {
+  window.clearTimeout(draftSaveTimer);
+  draftSaveTimer = window.setTimeout(postDraftToOpener, 800);
+}
+
 function initReportGenerator() {
   // 首先嘗試從URL參數獲取數據
   getDataFromURLParams();
@@ -328,11 +433,14 @@ function initReportGenerator() {
   // 監聽下拉選單變化
   document.getElementById('medicationSelect').addEventListener('change', updateReports);
   document.getElementById('aminophyllineSelect').addEventListener('change', updateReports);
+  document.getElementById('medicationSelect').addEventListener('change', scheduleDraftSave);
+  document.getElementById('aminophyllineSelect').addEventListener('change', scheduleDraftSave);
   
   // 監聽圖表變化
   document.addEventListener('mouseup', function() {
     // 鼠標釋放後更新報告
     setTimeout(updateReports, 100); // 短暫延遲確保值已更新
+    setTimeout(scheduleDraftSave, 150);
   });
   
   // 初始化顯示報告

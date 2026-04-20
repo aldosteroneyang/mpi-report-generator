@@ -783,17 +783,21 @@ document.getElementById('aminophyllineSelect').addEventListener('change', functi
 // 收集報告數據並發送給開啟窗口的函數
 function sendReportData() {
   // 收集報告數據
+  const areas = typeof buildCurrentReportAreas === 'function'
+    ? buildCurrentReportAreas()
+    : {
+        Findings: { value: document.getElementById('findingsBox').textContent },
+        Impression: { value: document.getElementById('impressionBox').textContent },
+        Addendum: { value: document.getElementById('addendumBox').textContent }
+      };
   const reportData = {
     type: 'GUI_REPORT_RESULT',
-    areas: {
-      Findings: document.getElementById('findingsBox').textContent,
-      Impression: document.getElementById('impressionBox').textContent,
-      Addendum: document.getElementById('addendumBox').textContent
-    },
+    areas,
+    generatorState: typeof getGeneratorState === 'function' ? getGeneratorState() : null,
     Procedure: document.getElementById('procedureBox').textContent,
-    Findings: document.getElementById('findingsBox').textContent,
-    Impression: document.getElementById('impressionBox').textContent,
-    Addendum: document.getElementById('addendumBox').textContent
+    Findings: areas.Findings.value,
+    Impression: areas.Impression.value,
+    Addendum: areas.Addendum.value
   };
 
   // 檢查是否有 window.opener

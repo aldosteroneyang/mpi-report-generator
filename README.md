@@ -25,6 +25,16 @@
 
 此項目使用純 HTML、CSS 和 JavaScript 開發，無需任何外部框架或庫，可直接在瀏覽器中運行。報告內容基於臨床標準化範本生成。
 
+## GUI Extension Integration
+
+- Manifest: `/extension-manifest.json`
+- MCIID: `9310308`
+- Canonical areas:
+  - `IO -> keyword` is read-only context
+  - `Findings -> area_120`, `Impression -> area_121`, `Addendum -> area_440` are writable
+- The generator sends `GUI_REPORT_RESULT.areas` as the primary payload and keeps legacy top-level fields temporarily.
+- Draft state is sent with `GUI_REPORT_DRAFT` so `gui-report-extension` can cache it locally by `referno` for 5 days.
+
 ## 注意事項
 
 - 本工具僅作為輔助工具，最終診斷結果應由專業醫師判斷
