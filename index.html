@@ -784,6 +784,12 @@ document.getElementById('aminophyllineSelect').addEventListener('change', functi
 function sendReportData() {
   // 收集報告數據
   const reportData = {
+    type: 'GUI_REPORT_RESULT',
+    areas: {
+      Findings: document.getElementById('findingsBox').textContent,
+      Impression: document.getElementById('impressionBox').textContent,
+      Addendum: document.getElementById('addendumBox').textContent
+    },
     Procedure: document.getElementById('procedureBox').textContent,
     Findings: document.getElementById('findingsBox').textContent,
     Impression: document.getElementById('impressionBox').textContent,

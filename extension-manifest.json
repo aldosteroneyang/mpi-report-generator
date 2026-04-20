@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "generator": {
+    "id": "mpi-report-generator",
+    "name": "MPI Report Generator",
+    "webappUrl": "https://mpi-report-generator.vercel.app/"
+  },
+  "reports": [
+    {
+      "mciid": "9310308",
+      "name": "Myocardial Perfusion Imaging",
+      "areas": [
+        {
+          "key": "IO",
+          "label": "IO",
+          "webnmId": "keyword",
+          "read": true,
+          "write": false
+        },
+        {
+          "key": "Findings",
+          "label": "Findings",
+          "webnmId": "area_120",
+          "read": true,
+          "write": true
+        },
+        {
+          "key": "Impression",
+          "label": "Impression",
+          "webnmId": "area_121",
+          "read": true,
+          "write": true
+        },
+        {
+          "key": "Addendum",
+          "label": "Addendum",
+          "webnmId": "area_440",
+          "read": true,
+          "write": true
+        }
+      ]
+    }
+  ]
+}
