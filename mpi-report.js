@@ -6,12 +6,19 @@
 // 等待 DOM 完全加載後初始化
 document.addEventListener('DOMContentLoaded', initReportGenerator);
 
+const MPI_GENERATOR_STATE_SCHEMA_VERSION = 1;
+const MPI_DRAFT_CACHE_TTL_MS = 5 * 24 * 60 * 60 * 1000;
+
 function decodeTransferData(encodedData) {
   try {
     return decodeURIComponent(escape(atob(encodedData)));
   } catch (error) {
     return atob(encodedData);
   }
+}
+
+function parseTransferData(encodedData) {
+  return JSON.parse(decodeTransferData(encodedData));
 }
 
 /**
@@ -21,6 +28,21 @@ function decodeTransferData(encodedData) {
 function getDataFromURLParams() {
   console.log('----------- 數據加載開始 -----------');
   console.log('完整URL:', window.location.href);
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const searchEncodedData = urlParams.get('data');
+
+  if (searchEncodedData) {
+    console.log('在URL搜索參數中找到 extension data');
+    try {
+      const data = parseTransferData(searchEncodedData);
+      handlePatientData(data);
+      console.log('----------- 數據處理完成 (extension data) -----------');
+      return true;
+    } catch (e) {
+      console.error('解析URL搜索參數時出錯:', e);
+    }
+  }
   
   // 獲取URL fragment (# 後面的部分)
   const fragmentString = window.location.hash.substring(1); // 移除開頭的 # 符號
@@ -74,32 +96,12 @@ function getDataFromURLParams() {
       const encodedData = fragmentString.substring(5); // 移除 'data=' 部分
       
       try {
-        // 解碼 Base64 資料
-        const jsonString = decodeTransferData(encodedData);
-        const data = JSON.parse(jsonString);
+        const data = parseTransferData(encodedData);
         handlePatientData(data);
         console.log('----------- 數據處理完成 (舊版格式) -----------');
         return true;
       } catch (e) {
         console.error('解析舊版數據格式時出錯:', e);
-      }
-    }
-    
-    // 2. 檢查URL搜索參數中的 data 參數
-    const urlParams = new URLSearchParams(window.location.search);
-    const searchEncodedData = urlParams.get('data');
-    
-    if (searchEncodedData) {
-      console.log('在URL搜索參數中找到數據');
-      try {
-        // 解碼 Base64 資料
-        const jsonString = decodeTransferData(searchEncodedData);
-        const data = JSON.parse(jsonString);
-        handlePatientData(data);
-        console.log('----------- 數據處理完成 (搜索參數) -----------');
-        return true;
-      } catch (e) {
-        console.error('解析URL搜索參數時出錯:', e);
       }
     }
     
@@ -247,8 +249,8 @@ function handlePatientData(data) {
     patientInfoBlock.style.display = 'block';
   }
 
-  if (data.cache?.generatorState) {
-    restoreGeneratorStateFromCache(data.cache.generatorState);
+  if (!restoreGeneratorStateFromCache(data.cache?.generatorState)) {
+    restoreGeneratorStateFromLocalStorage();
   }
   
   // 顯示通知
@@ -264,6 +266,67 @@ function getAreaValue(data, key) {
     return areaValue;
   }
   return data?.textValues?.[key] || '';
+}
+
+function getPatientInfoForStorage() {
+  return window.guiExtensionData?.patientInfo || window.patientData?.patientInfo || {};
+}
+
+function getCurrentMciid() {
+  return String(window.guiExtensionData?.mciid || window.patientData?.mciid || 'unknown').trim() || 'unknown';
+}
+
+function getCurrentReferno() {
+  return String(getPatientInfoForStorage().referno || '').trim();
+}
+
+function getScopedDraftStorageKey() {
+  const referno = getCurrentReferno();
+  return referno
+    ? `mpiReportGenerator:${getCurrentMciid()}:${referno}:generatorState`
+    : 'mpiReportGenerator:standalone:generatorState';
+}
+
+function isSupportedGeneratorState(generatorState) {
+  if (!generatorState || typeof generatorState !== 'object') return false;
+  const schemaVersion = generatorState.schemaVersion;
+  return schemaVersion == null || Number(schemaVersion) === MPI_GENERATOR_STATE_SCHEMA_VERSION;
+}
+
+function persistDraftStateToLocalStorage(generatorState = getGeneratorState()) {
+  try {
+    const now = Date.now();
+    localStorage.setItem(getScopedDraftStorageKey(), JSON.stringify({
+      schemaVersion: MPI_GENERATOR_STATE_SCHEMA_VERSION,
+      mciid: getCurrentMciid(),
+      referno: getCurrentReferno(),
+      generatorState,
+      updatedAt: now,
+      expiresAt: now + MPI_DRAFT_CACHE_TTL_MS
+    }));
+  } catch (error) {
+    console.warn('無法寫入本機暫存:', error);
+  }
+}
+
+function restoreGeneratorStateFromLocalStorage() {
+  try {
+    const storageKey = getScopedDraftStorageKey();
+    const savedDraft = localStorage.getItem(storageKey);
+    if (!savedDraft) return false;
+
+    const payload = JSON.parse(savedDraft);
+    if (!payload || payload.expiresAt <= Date.now()) {
+      localStorage.removeItem(storageKey);
+      return false;
+    }
+
+    const generatorState = payload.generatorState || payload;
+    return restoreGeneratorState(generatorState, '已載入此 referno 的本機暫存');
+  } catch (error) {
+    console.warn('載入本機暫存失敗:', error);
+    return false;
+  }
 }
 
 /**
@@ -355,9 +418,10 @@ function setChartValues(chartId, values) {
 
   const counts = window[`${chartId}Counts`] || {};
   values.forEach((value, index) => {
+    const segmentIndex = index + 1;
     const normalizedValue = clampSegmentValue(value);
-    const textElement = document.getElementById(`${chartId}-text-${index}`);
-    const segmentElement = document.getElementById(`${chartId}-segment-${index}`);
+    const textElement = document.getElementById(`${chartId}-text-${segmentIndex}`);
+    const segmentElement = document.getElementById(`${chartId}-segment-${segmentIndex}`);
 
     if (textElement) {
       textElement.textContent = String(normalizedValue);
@@ -368,13 +432,14 @@ function setChartValues(chartId, values) {
       segmentElement.classList.add(`state-${normalizedValue}`);
     }
 
-    counts[index] = normalizedValue;
+    counts[segmentIndex] = normalizedValue;
   });
   window[`${chartId}Counts`] = counts;
 }
 
 function getGeneratorState() {
   return {
+    schemaVersion: MPI_GENERATOR_STATE_SCHEMA_VERSION,
     medication: document.getElementById('medicationSelect')?.value || '',
     aminophylline: document.getElementById('aminophyllineSelect')?.value || '',
     topChart: collectDiagramValues('topChart'),
@@ -383,24 +448,32 @@ function getGeneratorState() {
   };
 }
 
-function restoreGeneratorStateFromCache(generatorState) {
-  if (!generatorState || typeof generatorState !== 'object') return;
+function restoreGeneratorState(generatorState, notificationMessage) {
+  if (!isSupportedGeneratorState(generatorState)) return false;
 
-  if (generatorState.medication && document.getElementById('medicationSelect')) {
+  if (Object.prototype.hasOwnProperty.call(generatorState, 'medication') && document.getElementById('medicationSelect')) {
     document.getElementById('medicationSelect').value = generatorState.medication;
   }
-  if (generatorState.aminophylline && document.getElementById('aminophyllineSelect')) {
+  if (Object.prototype.hasOwnProperty.call(generatorState, 'aminophylline') && document.getElementById('aminophyllineSelect')) {
     document.getElementById('aminophyllineSelect').value = generatorState.aminophylline;
   }
 
   setChartValues('topChart', generatorState.topChart);
   setChartValues('bottomChart', generatorState.bottomChart);
   updateReports();
-  showNotification('已載入此 referno 的 5 天內快取');
+  if (notificationMessage) {
+    showNotification(notificationMessage);
+  }
+  return true;
+}
+
+function restoreGeneratorStateFromCache(generatorState) {
+  return restoreGeneratorState(generatorState, '已載入此 referno 的 5 天內快取');
 }
 
 function buildCurrentReportAreas() {
   return {
+    Procedure: { value: document.getElementById('procedureBox')?.textContent || '' },
     Findings: { value: document.getElementById('findingsBox')?.textContent || '' },
     Impression: { value: document.getElementById('impressionBox')?.textContent || '' },
     Addendum: { value: document.getElementById('addendumBox')?.textContent || '' }
@@ -408,24 +481,34 @@ function buildCurrentReportAreas() {
 }
 
 let draftSaveTimer = null;
-function postDraftToOpener() {
+function postDraftToOpener(generatorState = getGeneratorState()) {
   if (!window.opener) return;
 
   window.opener.postMessage({
     type: 'GUI_REPORT_DRAFT',
     areas: buildCurrentReportAreas(),
-    generatorState: getGeneratorState()
+    generatorState
   }, '*');
+}
+
+function saveDraftStateNow() {
+  const generatorState = getGeneratorState();
+  persistDraftStateToLocalStorage(generatorState);
+  postDraftToOpener(generatorState);
+  return generatorState;
 }
 
 function scheduleDraftSave() {
   window.clearTimeout(draftSaveTimer);
-  draftSaveTimer = window.setTimeout(postDraftToOpener, 800);
+  draftSaveTimer = window.setTimeout(saveDraftStateNow, 800);
 }
 
 function initReportGenerator() {
   // 首先嘗試從URL參數獲取數據
-  getDataFromURLParams();
+  const hasIncomingData = getDataFromURLParams();
+  if (!hasIncomingData) {
+    restoreGeneratorStateFromLocalStorage();
+  }
 
   // 只保留清除按鈕的事件處理
   document.getElementById('clearValues').addEventListener('click', clearValues);
@@ -658,6 +741,7 @@ function clearValues() {
   
   // 更新報告
   updateReports();
+  saveDraftStateNow();
   
   showNotification('All values have been reset.');
 }

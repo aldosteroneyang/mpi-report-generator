@@ -780,21 +780,63 @@ document.getElementById('aminophyllineSelect').addEventListener('change', functi
   // 這裡可以添加根據選擇值進行的其他操作
 });
 
+function showSendNotification(message, isError = false) {
+  if (typeof showNotification === 'function') {
+    showNotification(message);
+    return;
+  }
+
+  const notification = document.getElementById('notification');
+  notification.textContent = message;
+  notification.style.visibility = 'visible';
+  if (isError) {
+    notification.style.color = '#b00020';
+  } else {
+    notification.style.color = 'black';
+  }
+
+  setTimeout(() => {
+    notification.style.visibility = 'hidden';
+  }, 3000);
+}
+
+function closeReportWindowAfterSend() {
+  window.setTimeout(() => {
+    try {
+      window.close();
+    } catch (error) {
+      console.warn('Unable to close report window automatically:', error);
+    }
+
+    window.setTimeout(() => {
+      if (!window.closed) {
+        showSendNotification('Report data sent. You may close this tab.');
+      }
+    }, 500);
+  }, 0);
+}
+
 // 收集報告數據並發送給開啟窗口的函數
 function sendReportData() {
   // 收集報告數據
   const areas = typeof buildCurrentReportAreas === 'function'
     ? buildCurrentReportAreas()
     : {
+        Procedure: { value: document.getElementById('procedureBox').textContent },
         Findings: { value: document.getElementById('findingsBox').textContent },
         Impression: { value: document.getElementById('impressionBox').textContent },
         Addendum: { value: document.getElementById('addendumBox').textContent }
       };
+  const generatorState = typeof getGeneratorState === 'function' ? getGeneratorState() : null;
+  if (generatorState && typeof persistDraftStateToLocalStorage === 'function') {
+    persistDraftStateToLocalStorage(generatorState);
+  }
+
   const reportData = {
     type: 'GUI_REPORT_RESULT',
     areas,
-    generatorState: typeof getGeneratorState === 'function' ? getGeneratorState() : null,
-    Procedure: document.getElementById('procedureBox').textContent,
+    generatorState,
+    Procedure: areas.Procedure.value,
     Findings: areas.Findings.value,
     Impression: areas.Impression.value,
     Addendum: areas.Addendum.value
@@ -806,28 +848,15 @@ function sendReportData() {
     window.opener.postMessage(reportData, '*');
     
     // 顯示通知
-    const notification = document.getElementById('notification');
-    notification.textContent = 'Report data sent!';
-    notification.style.visibility = 'visible';
-    
-    // 3秒後隱藏通知
-    setTimeout(() => {
-      notification.style.visibility = 'hidden';
-    }, 3000);
+    showSendNotification('Report data sent!');
     
     console.log('Report data sent:', reportData);
+    closeReportWindowAfterSend();
   } else {
     console.error('No opener found, unable to send data');
     
     // 顯示錯誤通知
-    const notification = document.getElementById('notification');
-    notification.textContent = 'No opener found, unable to send data';
-    notification.style.visibility = 'visible';
-    
-    // 3秒後隱藏通知
-    setTimeout(() => {
-      notification.style.visibility = 'hidden';
-    }, 3000);
+    showSendNotification('No opener found, unable to send data', true);
   }
 }
 

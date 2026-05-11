@@ -18,6 +18,13 @@
           "write": false
         },
         {
+          "key": "Procedure",
+          "label": "Procedure",
+          "webnmId": "area_119",
+          "read": true,
+          "write": true
+        },
+        {
           "key": "Findings",
           "label": "Findings",
           "webnmId": "area_120",
