@@ -30,7 +30,7 @@
 - Manifest: `/extension-manifest.json`
 - MCIID: `9310308`
 - Canonical areas:
-  - `IO -> keyword` is read-only context
+  - `IO -> keyword` and `ClinicalHistory -> area_118` are read-only context
   - `Procedure -> area_119`, `Findings -> area_120`, `Impression -> area_121`, `Addendum -> area_440` are writable
 - The generator sends `GUI_REPORT_RESULT.areas` as the primary payload and keeps legacy top-level fields temporarily.
 - Draft state is sent with `GUI_REPORT_DRAFT` so `gui-report-extension` can cache it locally by `referno` for 5 days.

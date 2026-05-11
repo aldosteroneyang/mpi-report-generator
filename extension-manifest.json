@@ -18,6 +18,13 @@
           "write": false
         },
         {
+          "key": "ClinicalHistory",
+          "label": "Clinical History",
+          "webnmId": "area_118",
+          "read": true,
+          "write": false
+        },
+        {
           "key": "Procedure",
           "label": "Procedure",
           "webnmId": "area_119",

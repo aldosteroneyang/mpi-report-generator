@@ -16,6 +16,7 @@ const areaMap = Object.fromEntries(mpiReport.areas.map(area => [area.key, {
 
 assert.deepEqual(areaMap, {
   IO: { webnmId: 'keyword', read: true, write: false },
+  ClinicalHistory: { webnmId: 'area_118', read: true, write: false },
   Procedure: { webnmId: 'area_119', read: true, write: true },
   Findings: { webnmId: 'area_120', read: true, write: true },
   Impression: { webnmId: 'area_121', read: true, write: true },
