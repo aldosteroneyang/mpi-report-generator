@@ -73,7 +73,8 @@
       margin-bottom: 20px;
     }
     
-    #medicationSelect, #aminophyllineSelect {
+    #medicationSelect, #aminophyllineSelect,
+    #comparisonDate, .comparison-option-input {
       padding: 8px;
       border-radius: 5px;
       border: 1px solid #ccc;
@@ -85,8 +86,152 @@
       appearance: auto; /* 使用瀏覽器原生下拉選單，提高反應速度 */
     }
     
-    #medicationSelect:focus, #aminophyllineSelect:focus {
+    #medicationSelect:focus, #aminophyllineSelect:focus,
+    #comparisonDate:focus, .comparison-option-input:focus {
       outline: 2px solid #007bff;
+    }
+
+    #comparisonDate.comparison-date-invalid {
+      background-color: #ffe5e8;
+      border-color: #dc3545;
+    }
+
+    .comparison-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 12px 15px;
+      border-bottom: 1px solid #dee2e6;
+      background-color: #fbfbfc;
+    }
+
+    .comparison-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+      color: #495057;
+    }
+
+    .comparison-field label {
+      font-weight: bold;
+    }
+
+    .comparison-field input[type="date"] {
+      min-width: 140px;
+    }
+
+    .comparison-date-warning {
+      display: none;
+      color: #b00020;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .comparison-date-warning.is-visible {
+      display: block;
+    }
+
+    .comparison-date-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .comparison-territory-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .comparison-territory-row {
+      display: grid;
+      grid-template-columns: 64px minmax(230px, 1fr) minmax(210px, 1.2fr);
+      gap: 10px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+      background-color: #fff;
+    }
+
+    .comparison-territory-name {
+      font-size: 13px;
+      font-weight: bold;
+      color: #343a40;
+    }
+
+    .comparison-row-fields {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .comparison-option-combobox {
+      position: relative;
+      min-width: 220px;
+    }
+
+    .comparison-option-input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .comparison-option-list {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 190px;
+      overflow-y: auto;
+      border: 1px solid #ced4da;
+      border-radius: 5px;
+      background-color: white;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      z-index: 500;
+    }
+
+    .comparison-option-list[hidden] {
+      display: none;
+    }
+
+    .comparison-option-item {
+      padding: 7px 9px;
+      font-size: 13px;
+      line-height: 1.25;
+      cursor: pointer;
+      color: #212529;
+    }
+
+    .comparison-option-item:hover,
+    .comparison-option-item.is-active {
+      background-color: #e9ecef;
+    }
+
+    .comparison-subregions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 10px;
+      font-size: 13px;
+      color: #343a40;
+    }
+
+    .comparison-subregions label {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    @media (max-width: 1200px) {
+      .comparison-territory-row {
+        grid-template-columns: 64px 1fr;
+      }
+
+      .comparison-subregions {
+        grid-column: 1 / -1;
+      }
     }
     
     /* 報告生成控制區域 */
@@ -319,6 +464,57 @@
     <div class="result-box" id="procedureBox"></div>
     
     <div class="result-header">Findings</div>
+    <div class="comparison-controls" aria-label="Previous study comparison controls">
+      <div class="comparison-date-row">
+        <div class="comparison-field">
+          <label for="comparisonDate">Previous study</label>
+          <input type="date" id="comparisonDate">
+          <div id="comparisonDateWarning" class="comparison-date-warning">Enter a valid previous study date to include comparison.</div>
+        </div>
+      </div>
+      <div class="comparison-territory-grid">
+        <div class="comparison-territory-row" data-comparison-vessel="LAD">
+          <div class="comparison-territory-name">LAD</div>
+          <div class="comparison-row-fields">
+            <div class="comparison-option-combobox" data-comparison-vessel="LAD">
+              <input type="text" class="comparison-option-input" data-comparison-vessel="LAD" value="mild progression" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-label="LAD comparison change">
+              <div class="comparison-option-list" data-comparison-vessel="LAD" role="listbox" hidden></div>
+            </div>
+          </div>
+          <div class="comparison-subregions" aria-label="LAD comparison regions">
+            <label><input type="checkbox" class="comparison-region-checkbox" data-comparison-vessel="LAD" value="anterior">anterior</label>
+            <label><input type="checkbox" class="comparison-region-checkbox" data-comparison-vessel="LAD" value="anteroseptal">anteroseptal</label>
+            <label><input type="checkbox" class="comparison-region-checkbox" data-comparison-vessel="LAD" value="apex">apex</label>
+          </div>
+        </div>
+        <div class="comparison-territory-row" data-comparison-vessel="RCA">
+          <div class="comparison-territory-name">RCA</div>
+          <div class="comparison-row-fields">
+            <div class="comparison-option-combobox" data-comparison-vessel="RCA">
+              <input type="text" class="comparison-option-input" data-comparison-vessel="RCA" value="mild progression" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-label="RCA comparison change">
+              <div class="comparison-option-list" data-comparison-vessel="RCA" role="listbox" hidden></div>
+            </div>
+          </div>
+          <div class="comparison-subregions" aria-label="RCA comparison regions">
+            <label><input type="checkbox" class="comparison-region-checkbox" data-comparison-vessel="RCA" value="inferoseptal">inferoseptal</label>
+            <label><input type="checkbox" class="comparison-region-checkbox" data-comparison-vessel="RCA" value="inferior">inferior</label>
+          </div>
+        </div>
+        <div class="comparison-territory-row" data-comparison-vessel="LCX">
+          <div class="comparison-territory-name">LCX</div>
+          <div class="comparison-row-fields">
+            <div class="comparison-option-combobox" data-comparison-vessel="LCX">
+              <input type="text" class="comparison-option-input" data-comparison-vessel="LCX" value="mild progression" autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-label="LCX comparison change">
+              <div class="comparison-option-list" data-comparison-vessel="LCX" role="listbox" hidden></div>
+            </div>
+          </div>
+          <div class="comparison-subregions" aria-label="LCX comparison regions">
+            <label><input type="checkbox" class="comparison-region-checkbox" data-comparison-vessel="LCX" value="inferolateral">inferolateral</label>
+            <label><input type="checkbox" class="comparison-region-checkbox" data-comparison-vessel="LCX" value="anterolateral">anterolateral</label>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="result-box" id="findingsBox"></div>
     
     <div class="result-header">Impression</div>

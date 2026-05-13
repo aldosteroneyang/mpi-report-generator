@@ -6,8 +6,45 @@
 // 等待 DOM 完全加載後初始化
 document.addEventListener('DOMContentLoaded', initReportGenerator);
 
-const MPI_GENERATOR_STATE_SCHEMA_VERSION = 1;
+const MPI_GENERATOR_STATE_SCHEMA_VERSION = 4;
 const MPI_DRAFT_CACHE_TTL_MS = 5 * 24 * 60 * 60 * 1000;
+const COMPARISON_DEFAULT_OPTION = 'mild progression';
+const COMPARISON_SEVERITY_CHANGE_TYPES = ['progression', 'regression', 'incongruence'];
+const COMPARISON_OPTIONS = [
+  'mild progression',
+  'moderate progression',
+  'marked progression',
+  'mild regression',
+  'moderate regression',
+  'marked regression',
+  'mild incongruence',
+  'moderate incongruence',
+  'marked incongruence',
+  'resolution',
+  'new lesion(s)',
+  'suspicious new lesion',
+  'without apparent change'
+];
+const COMPARISON_OPTION_SORT_ORDER = [
+  'new lesion(s)',
+  'suspicious new lesion',
+  'marked progression',
+  'moderate progression',
+  'mild progression',
+  'marked incongruence',
+  'moderate incongruence',
+  'mild incongruence',
+  'without apparent change',
+  'mild regression',
+  'moderate regression',
+  'marked regression',
+  'resolution'
+];
+const COMPARISON_TERRITORIES = [
+  { vessel: 'LAD', regions: ['anterior', 'anteroseptal', 'apex'] },
+  { vessel: 'RCA', regions: ['inferoseptal', 'inferior'] },
+  { vessel: 'LCX', regions: ['inferolateral', 'anterolateral'] }
+];
 
 function decodeTransferData(encodedData) {
   try {
@@ -290,7 +327,8 @@ function getScopedDraftStorageKey() {
 function isSupportedGeneratorState(generatorState) {
   if (!generatorState || typeof generatorState !== 'object') return false;
   const schemaVersion = generatorState.schemaVersion;
-  return schemaVersion == null || Number(schemaVersion) === MPI_GENERATOR_STATE_SCHEMA_VERSION;
+  const version = Number(schemaVersion);
+  return schemaVersion == null || version === 1 || version === 2 || version === 3 || version === MPI_GENERATOR_STATE_SCHEMA_VERSION;
 }
 
 function persistDraftStateToLocalStorage(generatorState = getGeneratorState()) {
@@ -437,11 +475,418 @@ function setChartValues(chartId, values) {
   window[`${chartId}Counts`] = counts;
 }
 
+function getComparisonTerritory(vessel) {
+  return COMPARISON_TERRITORIES.find(territory => territory.vessel === vessel);
+}
+
+function getComparisonTerritoryRegions(vessel) {
+  const territory = getComparisonTerritory(vessel);
+  return territory ? territory.regions : [];
+}
+
+function getComparisonOptionInput(vessel) {
+  return document.querySelector(`.comparison-option-input[data-comparison-vessel="${vessel}"]`);
+}
+
+function getComparisonOptionList(vessel) {
+  return document.querySelector(`.comparison-option-list[data-comparison-vessel="${vessel}"]`);
+}
+
+function getComparisonRegionCheckboxes(vessel) {
+  return Array.from(document.querySelectorAll(`.comparison-region-checkbox[data-comparison-vessel="${vessel}"]`));
+}
+
+function getComparisonRegionsForVessel(vessel) {
+  return getComparisonRegionCheckboxes(vessel)
+    .filter(input => input.checked)
+    .map(input => input.value);
+}
+
+function compactComparisonSearchText(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function acronymComparisonSearchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .map(token => token.charAt(0))
+    .join('');
+}
+
+function customComparisonFuzzySearch(query, candidate) {
+  const tokens = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+
+  const candidateLower = String(candidate || '').toLowerCase();
+  const candidateCompact = compactComparisonSearchText(candidateLower);
+  const candidateAcronym = acronymComparisonSearchText(candidateLower);
+
+  return tokens.every(token => {
+    const tokenCompact = compactComparisonSearchText(token);
+    return candidateLower.includes(token) ||
+      (tokenCompact !== '' && candidateCompact.includes(tokenCompact)) ||
+      (tokenCompact !== '' && candidateAcronym.includes(tokenCompact));
+  });
+}
+
+function filterComparisonOptions(query) {
+  return COMPARISON_OPTIONS.filter(option => customComparisonFuzzySearch(query, option));
+}
+
+function normalizeComparisonOption(value) {
+  const normalizedValue = String(value || '').trim().toLowerCase();
+  const matchingOption = COMPARISON_OPTIONS.find(option => option.toLowerCase() === normalizedValue);
+  return matchingOption || COMPARISON_DEFAULT_OPTION;
+}
+
+function legacyComparisonOptionFromParts(severity, changeType) {
+  const normalizedChangeType = changeType || 'progression';
+  if (COMPARISON_SEVERITY_CHANGE_TYPES.includes(normalizedChangeType)) {
+    return normalizeComparisonOption((severity || 'mild') + ' ' + normalizedChangeType);
+  }
+  return normalizeComparisonOption(normalizedChangeType);
+}
+
+function getComparisonOptionSortIndex(option) {
+  const sortIndex = COMPARISON_OPTION_SORT_ORDER.indexOf(option);
+  return sortIndex === -1 ? COMPARISON_OPTION_SORT_ORDER.length : sortIndex;
+}
+
+function setComparisonOptionForVessel(vessel, value) {
+  const input = getComparisonOptionInput(vessel);
+  if (!input) return;
+  const normalizedOption = normalizeComparisonOption(value);
+  input.value = normalizedOption;
+  input.dataset.comparisonOption = normalizedOption;
+}
+
+function setComparisonRegionsForVessel(vessel, regions) {
+  const selectedRegions = new Set(Array.isArray(regions) ? regions : []);
+  getComparisonRegionCheckboxes(vessel).forEach(input => {
+    input.checked = selectedRegions.has(input.value);
+  });
+}
+
+function resetComparisonControls() {
+  const comparisonDate = document.getElementById('comparisonDate');
+  if (comparisonDate) {
+    comparisonDate.value = '';
+  }
+
+  COMPARISON_TERRITORIES.forEach(territory => {
+    setComparisonOptionForVessel(territory.vessel, COMPARISON_DEFAULT_OPTION);
+    setComparisonRegionsForVessel(territory.vessel, []);
+  });
+  updateComparisonDateWarning();
+}
+
+function getComparisonItems() {
+  return COMPARISON_TERRITORIES.map(territory => ({
+    vessel: territory.vessel,
+    comparisonOption: normalizeComparisonOption(
+      getComparisonOptionInput(territory.vessel)?.dataset.comparisonOption ||
+        getComparisonOptionInput(territory.vessel)?.value ||
+        COMPARISON_DEFAULT_OPTION
+    ),
+    regions: getComparisonRegionsForVessel(territory.vessel)
+  }));
+}
+
+function restoreComparisonItem(item) {
+  if (!item || !getComparisonTerritory(item.vessel)) return;
+
+  const allowedRegions = new Set(getComparisonTerritoryRegions(item.vessel));
+  const regions = Array.isArray(item.regions)
+    ? item.regions.filter(region => allowedRegions.has(region))
+    : [];
+
+  setComparisonOptionForVessel(
+    item.vessel,
+    item.comparisonOption || legacyComparisonOptionFromParts(item.severity, item.changeType)
+  );
+  setComparisonRegionsForVessel(item.vessel, regions);
+}
+
+function restoreLegacyComparisonState(generatorState) {
+  const selectedVessels = new Set(Array.isArray(generatorState.comparisonRegions) ? generatorState.comparisonRegions : []);
+  COMPARISON_TERRITORIES.forEach(territory => {
+    restoreComparisonItem({
+      vessel: territory.vessel,
+      comparisonOption: legacyComparisonOptionFromParts(generatorState.comparisonSeverity, generatorState.comparisonChangeType),
+      regions: selectedVessels.has(territory.vessel) ? territory.regions : []
+    });
+  });
+}
+
+function restoreComparisonState(generatorState) {
+  resetComparisonControls();
+
+  const comparisonDate = document.getElementById('comparisonDate');
+  if (comparisonDate) {
+    comparisonDate.value = generatorState.comparisonDate || '';
+  }
+
+  if (Array.isArray(generatorState.comparisonItems)) {
+    generatorState.comparisonItems.forEach(restoreComparisonItem);
+    return;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(generatorState, 'comparisonRegions')) {
+    restoreLegacyComparisonState(generatorState);
+  }
+}
+
+function hasActiveComparisonRegions() {
+  return getComparisonItems().some(item => item.regions.length > 0);
+}
+
+function isValidComparisonDateValue(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return false;
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day;
+}
+
+function normalizeComparisonDateText(value) {
+  const slashDateMatch = String(value || '').trim().match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if (!slashDateMatch) return '';
+
+  const normalizedDate = slashDateMatch.slice(1).join('-');
+  return isValidComparisonDateValue(normalizedDate) ? normalizedDate : '';
+}
+
+function handleComparisonDatePaste(event) {
+  const normalizedDate = normalizeComparisonDateText(event.clipboardData?.getData('text') || '');
+  if (!normalizedDate) return;
+
+  event.preventDefault();
+  event.currentTarget.value = normalizedDate;
+  updateReports();
+  scheduleDraftSave();
+}
+
+function updateComparisonDateWarning() {
+  const comparisonDate = document.getElementById('comparisonDate');
+  const warning = document.getElementById('comparisonDateWarning');
+  const shouldWarn = hasActiveComparisonRegions() && !isValidComparisonDateValue(comparisonDate?.value || '');
+
+  if (comparisonDate) {
+    comparisonDate.classList.toggle('comparison-date-invalid', shouldWarn);
+  }
+  if (warning) {
+    warning.classList.toggle('is-visible', shouldWarn);
+  }
+  return shouldWarn;
+}
+
+function formatComparisonRegions(regions) {
+  return regions.join('/') + (regions.length > 1 ? ' regions' : ' region');
+}
+
+function formatComparisonOptionForGroups(option, regionGroups) {
+  if (option === 'new lesion(s)') {
+    return regionGroups.length > 1 ? 'new lesions' : 'new lesion';
+  }
+
+  if (option === 'suspicious new lesion') {
+    return regionGroups.length > 1 ? 'suspicious new lesions' : 'suspicious new lesion';
+  }
+
+  return option;
+}
+
+function buildGroupedComparisonClauses() {
+  const groupedItems = new Map();
+  getComparisonItems()
+    .filter(item => item.regions.length > 0)
+    .forEach(item => {
+      if (!groupedItems.has(item.comparisonOption)) {
+        groupedItems.set(item.comparisonOption, []);
+      }
+      groupedItems.get(item.comparisonOption).push({
+        vessel: item.vessel,
+        regions: item.regions
+      });
+    });
+
+  return Array.from(groupedItems.entries())
+    .sort(([optionA], [optionB]) => getComparisonOptionSortIndex(optionA) - getComparisonOptionSortIndex(optionB))
+    .map(([option, regionGroups]) => {
+      const optionText = formatComparisonOptionForGroups(option, regionGroups);
+      const regionText = regionGroups
+        .map(regionGroup => formatComparisonRegions(regionGroup.regions))
+        .join(' and ');
+      return optionText + ' in ' + regionText;
+    });
+}
+
+function buildComparisonFindingSentence() {
+  const comparisonDate = document.getElementById('comparisonDate')?.value || '';
+  const comparisonClauses = buildGroupedComparisonClauses();
+
+  if (!isValidComparisonDateValue(comparisonDate) || comparisonClauses.length === 0) {
+    return '';
+  }
+
+  return 'In comparison with the previous study on ' + comparisonDate + ', this study shows ' +
+    comparisonClauses.join('; ') + '.';
+}
+
+function appendComparisonFinding(findingsText) {
+  const comparisonSentence = buildComparisonFindingSentence();
+  if (!comparisonSentence) {
+    return findingsText;
+  }
+
+  return findingsText + '\n' + comparisonSentence;
+}
+
+function closeComparisonOptionList(vessel) {
+  const list = getComparisonOptionList(vessel);
+  const input = getComparisonOptionInput(vessel);
+  if (list) {
+    list.hidden = true;
+    list.innerHTML = '';
+  }
+  if (input) {
+    input.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function closeAllComparisonOptionLists(exceptVessel) {
+  COMPARISON_TERRITORIES.forEach(territory => {
+    if (territory.vessel !== exceptVessel) {
+      closeComparisonOptionList(territory.vessel);
+    }
+  });
+}
+
+function selectComparisonOption(vessel, option) {
+  setComparisonOptionForVessel(vessel, option);
+  closeComparisonOptionList(vessel);
+  updateReports();
+  scheduleDraftSave();
+}
+
+function renderComparisonOptionList(vessel, query) {
+  const list = getComparisonOptionList(vessel);
+  const input = getComparisonOptionInput(vessel);
+  if (!list || !input) return;
+
+  closeAllComparisonOptionLists(vessel);
+  const options = filterComparisonOptions(query);
+  list.innerHTML = '';
+
+  options.forEach((option, index) => {
+    const item = document.createElement('div');
+    item.className = 'comparison-option-item' + (index === 0 ? ' is-active' : '');
+    item.setAttribute('role', 'option');
+    item.textContent = option;
+    item.addEventListener('mousedown', event => {
+      event.preventDefault();
+      selectComparisonOption(vessel, option);
+    });
+    list.appendChild(item);
+  });
+
+  list.hidden = options.length === 0;
+  input.setAttribute('aria-expanded', options.length > 0 ? 'true' : 'false');
+}
+
+function moveComparisonOptionHighlight(vessel, direction) {
+  const list = getComparisonOptionList(vessel);
+  if (!list || list.hidden) return;
+
+  const items = Array.from(list.querySelectorAll('.comparison-option-item'));
+  if (items.length === 0) return;
+
+  const activeIndex = Math.max(items.findIndex(item => item.classList.contains('is-active')), 0);
+  const nextIndex = (activeIndex + direction + items.length) % items.length;
+  items.forEach((item, index) => item.classList.toggle('is-active', index === nextIndex));
+  items[nextIndex].scrollIntoView({ block: 'nearest' });
+}
+
+function commitHighlightedComparisonOption(vessel) {
+  const list = getComparisonOptionList(vessel);
+  if (!list || list.hidden) return false;
+
+  const activeItem = list.querySelector('.comparison-option-item.is-active') || list.querySelector('.comparison-option-item');
+  if (!activeItem) return false;
+
+  selectComparisonOption(vessel, activeItem.textContent);
+  return true;
+}
+
+function normalizeComparisonOptionInput(vessel) {
+  const input = getComparisonOptionInput(vessel);
+  if (!input) return;
+
+  const normalizedValue = normalizeComparisonOption(input.value);
+  if (input.value !== normalizedValue || input.dataset.comparisonOption !== normalizedValue) {
+    setComparisonOptionForVessel(vessel, normalizedValue);
+    updateReports();
+    scheduleDraftSave();
+  }
+}
+
+function initializeComparisonOptionComboboxes() {
+  COMPARISON_TERRITORIES.forEach(territory => {
+    const input = getComparisonOptionInput(territory.vessel);
+    if (!input) return;
+
+    input.addEventListener('focus', () => {
+      input.select();
+      renderComparisonOptionList(territory.vessel, '');
+    });
+    input.addEventListener('input', () => {
+      renderComparisonOptionList(territory.vessel, input.value);
+      updateReports();
+      scheduleDraftSave();
+    });
+    input.addEventListener('keydown', event => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        renderComparisonOptionList(territory.vessel, input.value);
+        moveComparisonOptionHighlight(territory.vessel, 1);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        renderComparisonOptionList(territory.vessel, input.value);
+        moveComparisonOptionHighlight(territory.vessel, -1);
+      } else if (event.key === 'Enter') {
+        if (commitHighlightedComparisonOption(territory.vessel)) {
+          event.preventDefault();
+        }
+      } else if (event.key === 'Escape') {
+        closeComparisonOptionList(territory.vessel);
+      }
+    });
+    input.addEventListener('blur', () => {
+      window.setTimeout(() => {
+        normalizeComparisonOptionInput(territory.vessel);
+        closeComparisonOptionList(territory.vessel);
+      }, 120);
+    });
+  });
+
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.comparison-option-combobox')) {
+      closeAllComparisonOptionLists();
+    }
+  });
+}
+
 function getGeneratorState() {
   return {
     schemaVersion: MPI_GENERATOR_STATE_SCHEMA_VERSION,
     medication: document.getElementById('medicationSelect')?.value || '',
     aminophylline: document.getElementById('aminophyllineSelect')?.value || '',
+    comparisonDate: document.getElementById('comparisonDate')?.value || '',
+    comparisonItems: getComparisonItems(),
     topChart: collectDiagramValues('topChart'),
     bottomChart: collectDiagramValues('bottomChart'),
     updatedAt: new Date().toISOString()
@@ -458,6 +903,7 @@ function restoreGeneratorState(generatorState, notificationMessage) {
     document.getElementById('aminophyllineSelect').value = generatorState.aminophylline;
   }
 
+  restoreComparisonState(generatorState);
   setChartValues('topChart', generatorState.topChart);
   setChartValues('bottomChart', generatorState.bottomChart);
   updateReports();
@@ -518,6 +964,15 @@ function initReportGenerator() {
   document.getElementById('aminophyllineSelect').addEventListener('change', updateReports);
   document.getElementById('medicationSelect').addEventListener('change', scheduleDraftSave);
   document.getElementById('aminophyllineSelect').addEventListener('change', scheduleDraftSave);
+  initializeComparisonOptionComboboxes();
+  const comparisonDateInput = document.getElementById('comparisonDate');
+  comparisonDateInput.addEventListener('paste', handleComparisonDatePaste);
+  comparisonDateInput.addEventListener('input', updateReports);
+  comparisonDateInput.addEventListener('input', scheduleDraftSave);
+  document.querySelectorAll('#comparisonDate, .comparison-region-checkbox').forEach(control => {
+    control.addEventListener('change', updateReports);
+    control.addEventListener('change', scheduleDraftSave);
+  });
   
   // 監聽圖表變化
   document.addEventListener('mouseup', function() {
@@ -539,8 +994,9 @@ function updateReports() {
   
   // 更新 Findings 和 Impression 區塊
   const reportData = generateReportFromDiagrams();
-  document.getElementById('findingsBox').textContent = reportData.findings;
+  document.getElementById('findingsBox').textContent = appendComparisonFinding(reportData.findings);
   document.getElementById('impressionBox').textContent = reportData.impression;
+  updateComparisonDateWarning();
   
   // 更新 Addendum 區塊
   updateAddendumText(reportData.impression);
@@ -734,6 +1190,7 @@ function clearValues() {
   // 重設下拉選單
   document.getElementById('medicationSelect').value = "Persantin";
   document.getElementById('aminophyllineSelect').value = "No aminophylline";
+  resetComparisonControls();
   
   // 清除所有圖表的值
   clearDiagramValues('topChart');
